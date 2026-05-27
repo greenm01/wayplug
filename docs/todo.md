@@ -89,14 +89,12 @@ Done: `wayplug_host_interface` has an append-only
 effects through it, and ABI normalization accepts older callback-table
 sizes.
 
-### Real snapshot copy and relationship invariants
+### ~~Real snapshot copy and relationship invariants~~
 
-`data/snapshot.zig` counts records today; should copy them. The
-comptime walker scaffold is already in place — fill in the field-copy
-body. `data/invariants.zig` is no-op; add the cross-table relationship
-checks called out in [dod.md](dod.md) § Invariants (every
-`Resource.client_id` exists, every embed's surface ids exist, no
-destroyed records in indexes).
+Done: `data/snapshot.zig` now returns caller-owned copies of model
+records, and `data/invariants.zig` checks dense table consistency,
+relationship indexes, cross-table references, and stale/dead indexed
+resources.
 
 ### Snapshot C ABI
 

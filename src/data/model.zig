@@ -23,6 +23,8 @@ pub fn EntityManager(comptime K: type, comptime V: type) type {
 
     return struct {
         const Self = @This();
+        pub const Key = K;
+        pub const Value = V;
 
         records: std.ArrayListUnmanaged(V) = .empty,
         index_by_id: std.AutoArrayHashMapUnmanaged(K, usize) = .empty,
