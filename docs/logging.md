@@ -50,6 +50,9 @@ void (*on_protocol_error)(void *userdata,
 
 Fires when an internal `protocol_error` effect is queued for a client.
 `code` is the Wayland protocol error code recorded by the delegate.
+Registry bind validation uses this path too: invalid global bind versions
+surface as `WL_DISPLAY_ERROR_INVALID_METHOD`, and unexpected missing host
+objects during bind surface as `WL_DISPLAY_ERROR_IMPLEMENTATION`.
 
 ### Constraints
 

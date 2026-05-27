@@ -259,6 +259,11 @@ pub const Server = struct {
         return engine_mod.client.clientForWlClient(&self.engine.model, client);
     }
 
+    pub fn protocolErrorForClient(self: *Server, client: *wls.wl_client, code: u32) void {
+        const client_id = self.clientIdForWlClient(client) orelse return;
+        self.engine.protocolError(client_id, code) catch {};
+    }
+
     pub fn createResource(
         self: *Server,
         client: *wls.wl_client,
@@ -390,6 +395,49 @@ const ProtocolErrorTestState = struct {
     calls: u32 = 0,
 };
 
+const RegistryTestState = struct {
+    compositor_enabled: bool = false,
+    subcompositor_enabled: bool = false,
+    shm_enabled: bool = false,
+};
+
+fn fakeCompositor(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_compositor {
+    const state: *RegistryTestState = @ptrCast(@alignCast(userdata.?));
+    if (!state.compositor_enabled) return null;
+    return @ptrFromInt(0x1000);
+}
+
+fn fakeSubcompositor(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_subcompositor {
+    const state: *RegistryTestState = @ptrCast(@alignCast(userdata.?));
+    if (!state.subcompositor_enabled) return null;
+    return @ptrFromInt(0x2000);
+}
+
+fn fakeShm(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_shm {
+    const state: *RegistryTestState = @ptrCast(@alignCast(userdata.?));
+    if (!state.shm_enabled) return null;
+    return @ptrFromInt(0x3000);
+}
+
+fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
+    return .{
+        .size = @sizeOf(c_api.WayplugHostInterface),
+        .version = c_api.abi_version,
+        .userdata = userdata,
+        .get_compositor = fakeCompositor,
+        .get_subcompositor = fakeSubcompositor,
+        .get_shm = fakeShm,
+        .get_seat = null,
+        .get_xdg_wm_base = null,
+        .get_dmabuf = null,
+        .get_subsurface_offset = null,
+        .on_client_connected = null,
+        .on_surface_created = null,
+        .on_client_closed = null,
+        .on_protocol_error = null,
+    };
+}
+
 fn recordProtocolError(
     userdata: ?*anyopaque,
     client: ?*c_api.wayplug_client,
@@ -458,4 +506,56 @@ test "protocol_error effect drains to host callback" {
     try std.testing.expectEqual(@as(u32, 1), state.calls);
     try std.testing.expectEqual(@as(u32, 77), state.code);
     try std.testing.expect(state.client == opaqueClient(handle));
+}
+
+test "server registers only host-supplied globals" {
+    var state = RegistryTestState{ .compositor_enabled = true, .shm_enabled = true };
+    const iface = testHostInterface(&state);
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    try std.testing.expectEqual(@as(usize, 2), s.globals.items.len);
+    try std.testing.expectEqual(@as(u32, 4), wls.c.wl_global_get_version(s.globals.items[0]));
+    try std.testing.expectEqual(@as(u32, 1), wls.c.wl_global_get_version(s.globals.items[1]));
+}
+
+test "invalid registry bind queues protocol error without resource" {
+    var state = RegistryTestState{ .compositor_enabled = true };
+    var iface = testHostInterface(&state);
+    iface.userdata = &state;
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    _ = s.openClientDisplay() orelse return error.OpenClientDisplayFailed;
+    const handle = s.client_handles.items[0];
+    s.engine.effects.clear();
+
+    registry_bindings.bindCompositor(handle.wl_client, s, 5, 2);
+
+    try std.testing.expectEqual(@as(usize, 0), s.engine.model.resources.count());
+    try std.testing.expectEqual(@as(usize, 1), s.engine.effects.count());
+    const effect = s.engine.effects.pending()[0];
+    try std.testing.expectEqual(@as(u32, @intCast(wls.c.WL_DISPLAY_ERROR_INVALID_METHOD)), effect.protocol_error.code);
+    try std.testing.expectEqual(handle.client_id, effect.protocol_error.client_id);
+}
+
+test "missing host object at registry bind queues implementation error" {
+    var state = RegistryTestState{ .compositor_enabled = true };
+    var iface = testHostInterface(&state);
+    iface.userdata = &state;
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    _ = s.openClientDisplay() orelse return error.OpenClientDisplayFailed;
+    const handle = s.client_handles.items[0];
+    s.engine.effects.clear();
+    state.compositor_enabled = false;
+
+    registry_bindings.bindCompositor(handle.wl_client, s, 1, 2);
+
+    try std.testing.expectEqual(@as(usize, 0), s.engine.model.resources.count());
+    try std.testing.expectEqual(@as(usize, 1), s.engine.effects.count());
+    const effect = s.engine.effects.pending()[0];
+    try std.testing.expectEqual(@as(u32, @intCast(wls.c.WL_DISPLAY_ERROR_IMPLEMENTATION)), effect.protocol_error.code);
+    try std.testing.expectEqual(handle.client_id, effect.protocol_error.client_id);
 }

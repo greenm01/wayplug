@@ -53,6 +53,11 @@ pub const Engine = struct {
         client.clientDestroy(&self.model, id);
     }
 
+    pub fn protocolError(self: *Engine, client_id: types.ClientId, code: u32) !void {
+        if (!self.model.clients.contains(client_id)) return;
+        try self.effects.push(.{ .protocol_error = .{ .client_id = client_id, .code = code } });
+    }
+
     pub fn resourceCreate(
         self: *Engine,
         client_id: types.ClientId,

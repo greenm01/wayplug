@@ -49,11 +49,12 @@ in `src/protocol/runtime.zig`. `server.zig` remains the display/client
 owner and registration coordinator, and lifecycle mutation still flows
 through the engine facade.
 
-### Strengthen registry/global behavior
+### ~~Strengthen registry/global behavior~~
 
-The initial registry behavior advertises host-supplied core globals.
-Add version-selection tests, invalid-version handling, and clearer
-global/resource diagnostics before expanding protocol coverage.
+Done: registry bind handling now validates requested versions instead of
+silently downgrading them, invalid binds queue `protocol_error`
+diagnostics, and tests cover version selection plus host-supplied global
+registration.
 
 ### Complete embed teardown
 
