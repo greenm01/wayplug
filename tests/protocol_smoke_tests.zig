@@ -125,6 +125,8 @@ const HostSmokeState = struct {
     embed_attached: std.atomic.Value(bool) = .init(false),
     embed_mapped_count: std.atomic.Value(u32) = .init(0),
     embed_resized_count: std.atomic.Value(u32) = .init(0),
+    embed_destroyed_count: std.atomic.Value(u32) = .init(0),
+    client_closed_count: std.atomic.Value(u32) = .init(0),
 };
 
 const ServerThreadContext = struct {
@@ -356,6 +358,18 @@ fn hostEmbedResized(
     _ = state.embed_resized_count.fetchAdd(1, .acq_rel);
 }
 
+fn hostEmbedDestroyed(userdata: ?*anyopaque, embed_id: u32) callconv(.c) void {
+    if (embed_id == 0) return;
+    const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return));
+    _ = state.embed_destroyed_count.fetchAdd(1, .acq_rel);
+}
+
+fn hostClientClosed(userdata: ?*anyopaque, client: ?*wayplug.c_api.wayplug_client) callconv(.c) void {
+    if (client == null) return;
+    const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return));
+    _ = state.client_closed_count.fetchAdd(1, .acq_rel);
+}
+
 test "weston headless smoke forwards create attach commit and embed" {
     if (builtin.os.tag != .linux) return error.SkipZigTest;
 
@@ -443,16 +457,21 @@ test "weston headless smoke forwards create attach commit and embed" {
         .get_subsurface_offset = hostSubsurfaceOffset,
         .on_client_connected = null,
         .on_surface_created = hostSurfaceCreated,
-        .on_client_closed = null,
+        .on_client_closed = hostClientClosed,
         .on_protocol_error = null,
         .on_embed_mapped = hostEmbedMapped,
         .on_embed_resized = hostEmbedResized,
-        .on_embed_destroyed = null,
+        .on_embed_destroyed = hostEmbedDestroyed,
     };
     const server = try wayplug.server.Server.create(allocator, &iface, null);
     defer server.destroy();
 
     const plugin_display = server.openClientDisplay() orelse return error.PluginDisplayOpenFailed;
+    var plugin_display_open = true;
+    defer if (plugin_display_open) {
+        _ = server.closeClientDisplay(plugin_display);
+        server.dispatch();
+    };
     var thread_context = ServerThreadContext{ .server = server };
     var server_thread: ?std.Thread = try std.Thread.spawn(.{}, ServerThreadContext.run, .{&thread_context});
     defer {
@@ -476,12 +495,10 @@ test "weston headless smoke forwards create attach commit and embed" {
         try std.testing.expectEqual(host_registry_state.output_scale, plugin_registry_state.output_scale);
     }
     const plugin_surface = wlc.wl_compositor_create_surface(plugin_registry_state.compositor.?) orelse return error.CreatePluginSurfaceFailed;
-    defer wlc.wl_surface_destroy(plugin_surface);
     try flushDisplay(plugin_display);
     try waitForSurfaceCreated(&host_state);
 
     const buffer = try createPluginBuffer(plugin_registry_state.shm.?);
-    defer wlc.wl_buffer_destroy(buffer);
     wlc.wl_surface_attach(plugin_surface, buffer, 0, 0);
     wlc.wl_surface_damage(plugin_surface, 0, 0, 16, 16);
     wlc.wl_surface_commit(plugin_surface);
@@ -509,6 +526,19 @@ test "weston headless smoke forwards create attach commit and embed" {
     try std.testing.expectEqual(expected_resource_count, server.engine.model.resources.count());
     try std.testing.expectEqual(@as(c_int, 0), wlc.wl_display_get_error(plugin_display));
     try std.testing.expectEqual(@as(c_int, 0), wlc.wl_display_get_error(host_display));
+
+    try std.testing.expect(server.closeClientDisplay(plugin_display));
+    plugin_display_open = false;
+    server.dispatch();
+    try roundtripDisplay(host_display);
+
+    try std.testing.expectEqual(@as(u32, 1), host_state.embed_destroyed_count.load(.acquire));
+    try std.testing.expectEqual(@as(u32, 1), host_state.client_closed_count.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 0), server.client_handles.items.len);
+    try std.testing.expectEqual(@as(usize, 0), server.engine.model.embeds.count());
+    try std.testing.expectEqual(@as(usize, 0), server.engine.model.surfaces.count());
+    try std.testing.expectEqual(@as(usize, 0), server.engine.model.buffers.count());
+    try std.testing.expectEqual(@as(usize, 0), server.engine.model.resources.count());
 
     weston_running = false;
     weston.kill(std.testing.io);

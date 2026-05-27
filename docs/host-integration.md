@@ -197,8 +197,10 @@ while (running) {
 
 `wayplug_server_dispatch` fires lifecycle callbacks synchronously before
 it returns. Inside a callback the host may issue calls on its *upstream*
-connection, but must not call back into the same `wayplug_server` —
-re-entrant calls are undefined.
+connection. The one supported same-server call is
+`wayplug_embed_attach` from `on_surface_created`, which creates the
+embedded editor session for that plugin client. Other same-server calls
+from lifecycle callbacks are undefined.
 
 ## Opening a Client Connection for a Plugin
 
@@ -246,14 +248,22 @@ static void on_surface_created(void *u, wayplug_client *client,
 `wayplug_embed_attach` creates a `wl_subsurface`, positions it at the
 offset returned by `get_subsurface_offset`, and tracks it in the model. The
 host does not see `wl_subcompositor` directly — wayplug owns that wiring.
+One client can have one active embedded editor session. If attach returns
+`false`, no session was established and the host should not call
+`wayplug_embed_resize` for that client until another surface is created and
+attached.
 
 ## Resize Round-Trip
 
 When the user resizes Carla's window, Carla updates its editor dimensions
 and notifies wayplug. wayplug stores the new size in the embed record and
-sends the relevant subsurface positioning calls upstream. If the plugin
-needs a size hint, wayplug fires the configured plugin-format extension
-(CLAP `gui.set_size`, LV2 idle interface) on the host's behalf.
+sends the relevant subsurface positioning calls upstream. Width and height
+must be non-negative; zero is accepted. `wayplug_embed_resize` returns
+`false` if the client is closing or has no active embedded session.
+
+If the plugin needs a size hint, a plugin-format adapter can layer that on
+top of this resize notification path. The core library stays
+format-neutral.
 
 ```c
 void carla_on_window_resize(int new_width, int new_height) {
@@ -271,8 +281,11 @@ wayplug:
 
 1. Walks the client's owned objects in teardown order (see
    [Architecture § Teardown Order](architecture.md#teardown-order)).
-2. Fires `on_client_closed` after the teardown completes.
-3. Releases the client row.
+2. Releases wayplug-owned embed wiring, including the internal
+   `wl_subsurface` proxy.
+3. Fires `on_embed_destroyed` for active embedded sessions.
+4. Fires `on_client_closed` after embed teardown completes.
+5. Releases the client row.
 
 The host clears its editor area and is ready to host the next plugin.
 
@@ -286,21 +299,10 @@ Destroy invalidates every handle the server issued, including
 `plugin_display` values and any `wayplug_client *` the host retained. The
 host must not call wayplug functions after destroy returns.
 
-## What This Walkthrough Validates
+## Embedded Session Contract
 
-Drafting the walkthrough exposed three things the C ABI sketch needs
-before code lands:
-
-1. **Lifecycle callback fields** on `wayplug_host_interface`
-   (`on_client_connected`, `on_surface_created`, `on_client_closed`, at
-   minimum). The current sketch only covers upstream getters.
-2. **An `embed_attach` / `embed_resize` surface** so the host doesn't
-   touch `wl_subcompositor` directly. Without these, the host has to
-   reach past wayplug to position the child surface, which defeats the
-   delegated-server pattern.
-3. **A `wayplug_client *` opaque handle** the host can hold between the
-   `open_client_display` call and a subsequent operation
-   (`embed_resize`). Without it the host has to map `wl_display *` back
-   to a client every time, duplicating the index wayplug already owns.
-
-Folding these into `c-abi-sketch.md` is tracked separately.
+The public ABI stays client-scoped. Internally, wayplug treats a successful
+`wayplug_embed_attach` as the start of one embedded editor session for that
+client. `wayplug_embed_resize` targets that active session, and client
+disconnect or server destroy ends it. A future plugin-format adapter may wrap
+this in a higher-level handle if real host integrations need one.

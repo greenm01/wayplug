@@ -81,8 +81,10 @@ destroys that client's embeds.
 
 - Callbacks return `void`. They report; they do not gate. Policy decisions
   run in the engine before the notification fires.
-- Callbacks must not call back into the same `wayplug_server` instance.
-  They may issue Wayland calls on the host's own upstream connection.
+- `on_surface_created` may call `wayplug_embed_attach` on the same server to
+  establish the embedded editor session. Other same-server calls from
+  callbacks are undefined.
+- Callbacks may issue Wayland calls on the host's own upstream connection.
 - The engine drains its effect queue at the end of each dispatch tick, after
   every protocol callback for that tick has run. See [Architecture §
   Host Notifications](architecture.md#host-notifications).
@@ -170,7 +172,9 @@ diagnostics_dirty
 
 `protocol_error` is surfaced through `on_protocol_error`. Embed lifecycle
 effects are surfaced through the embed callbacks, keyed on embed id (a stable
-`uint32_t` that is not reused in a server's lifetime).
+`uint32_t` that is not reused in a server's lifetime). For a normal plugin
+disconnect, `embed_destroyed` is delivered before `client_closed` for the
+owning client.
 
 ## Developer and Agent Debugging Evidence
 

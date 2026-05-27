@@ -5,13 +5,16 @@ const std = @import("std");
 const c_api = @import("c_api.zig");
 const snapshot_mod = @import("data/snapshot.zig");
 const types = @import("data/types.zig");
+const engine_embed = @import("engine/embed.zig");
 const engine_mod = @import("engine/engine.zig");
+const engine_surface = @import("engine/surface.zig");
 const host_mod = @import("host.zig");
 const protocol_registry = @import("protocol/registry.zig");
 const protocol_runtime = @import("protocol/runtime.zig");
 const wlc = @import("wayland/client.zig");
 const wlp = @import("wayland/protocols.zig");
 const wls = @import("wayland/server.zig");
+const xdgc = @import("wayland/xdg_client.zig");
 const xdgs = @import("wayland/xdg_server.zig");
 
 const sys = @cImport({
@@ -183,6 +186,7 @@ pub const Server = struct {
     }
 
     fn closeClientHandle(self: *Server, handle: *ClientHandle, emit_effect: bool) void {
+        self.releaseClientOwnedUpstreams(handle.client_id);
         if (emit_effect) {
             self.engine.clientDestroy(handle.client_id) catch {};
             handle.close_pending = true;
@@ -341,43 +345,64 @@ pub const Server = struct {
         child_surface: *wlp.wl_surface,
     ) bool {
         if (handle.server != self) return false;
+        if (handle.close_pending) return false;
         if (self.activeEmbedForClient(handle.client_id) != null) return false;
         const subcompositor = self.host.getSubcompositor() orelse return false;
 
         const child_resource_id = self.engine.resourceForUpstreamProxy(@ptrCast(child_surface)) orelse return false;
         const child_surface_id = self.engine.surfaceForResource(child_resource_id) orelse return false;
-        self.engine.surfaceAssignRole(child_surface_id, .subsurface) catch return false;
+        const child_role = self.engine.surfaceRole(child_surface_id) orelse return false;
+        if (child_role != .none) return false;
 
-        const parent_resource_id = self.engine.resourceCreate(
+        var parent_resource_id: ?types.ResourceId = null;
+        var parent_surface_id: ?types.SurfaceId = null;
+        var subsurface: ?*wlp.wl_subsurface = null;
+        var subsurface_resource_id: ?types.ResourceId = null;
+        var embed_id: ?types.EmbedId = null;
+        var success = false;
+        defer if (!success) {
+            self.rollbackEmbedAttach(
+                parent_resource_id,
+                parent_surface_id,
+                subsurface,
+                subsurface_resource_id,
+                embed_id,
+            );
+        };
+
+        parent_resource_id = self.engine.resourceCreate(
             handle.client_id,
             .surface,
             null,
             @ptrCast(parent_surface),
         ) catch return false;
-        const parent_surface_id = @import("engine/surface.zig").surfaceCreate(
+        parent_surface_id = engine_surface.surfaceCreate(
             &self.engine.model,
             handle.client_id,
-            parent_resource_id,
+            parent_resource_id.?,
         ) catch return false;
 
-        const subsurface = wlc.c.wl_subcompositor_get_subsurface(subcompositor, child_surface, parent_surface) orelse return false;
-        const subsurface_resource_id = self.engine.resourceCreate(
+        subsurface = wlc.c.wl_subcompositor_get_subsurface(subcompositor, child_surface, parent_surface) orelse return false;
+        subsurface_resource_id = self.engine.resourceCreate(
             handle.client_id,
             .subsurface,
             null,
-            @ptrCast(subsurface),
+            @ptrCast(subsurface.?),
         ) catch return false;
 
-        const embed_id = self.engine.embedCreate(handle.client_id, parent_surface_id) catch return false;
-        self.engine.embedAttachChild(embed_id, child_surface_id) catch return false;
-        self.engine.embedSetSubsurfaceResource(embed_id, subsurface_resource_id) catch return false;
-        self.applyEmbedOffset(handle, embed_id);
-        self.engine.embedMap(embed_id) catch return false;
+        embed_id = self.engine.embedCreate(handle.client_id, parent_surface_id.?) catch return false;
+        self.engine.embedAttachChild(embed_id.?, child_surface_id) catch return false;
+        self.engine.embedSetSubsurfaceResource(embed_id.?, subsurface_resource_id.?) catch return false;
+        self.engine.surfaceAssignRole(child_surface_id, .subsurface) catch return false;
+        self.applyEmbedOffset(handle, embed_id.?);
+        self.engine.embedMap(embed_id.?) catch return false;
+        success = true;
         return true;
     }
 
     pub fn embedResize(self: *Server, handle: *ClientHandle, width: i32, height: i32) bool {
         if (handle.server != self) return false;
+        if (handle.close_pending) return false;
         const embed_id = self.activeEmbedForClient(handle.client_id) orelse return false;
         self.engine.embedResize(embed_id, width, height) catch return false;
         self.applyEmbedOffset(handle, embed_id);
@@ -389,6 +414,84 @@ pub const Server = struct {
             if (embed.client_id == client_id and embed.state != .destroyed) return embed.id;
         }
         return null;
+    }
+
+    fn rollbackEmbedAttach(
+        self: *Server,
+        parent_resource_id: ?types.ResourceId,
+        parent_surface_id: ?types.SurfaceId,
+        subsurface: ?*wlp.wl_subsurface,
+        subsurface_resource_id: ?types.ResourceId,
+        embed_id: ?types.EmbedId,
+    ) void {
+        if (embed_id) |id| engine_embed.embedDestroy(&self.engine.model, id);
+        if (subsurface_resource_id) |resource_id| {
+            if (self.engine.upstreamProxyForResource(resource_id)) |proxy| {
+                wlc.c.wl_subsurface_destroy(@ptrCast(proxy));
+            }
+            self.engine.resourceDestroy(resource_id);
+        } else if (subsurface) |proxy| {
+            wlc.c.wl_subsurface_destroy(proxy);
+        }
+        if (parent_surface_id) |surface_id| engine_surface.surfaceDestroy(&self.engine.model, surface_id);
+        if (parent_resource_id) |resource_id| self.engine.resourceDestroy(resource_id);
+    }
+
+    fn releaseClientOwnedUpstreams(self: *Server, client_id: types.ClientId) void {
+        // Release role/helper objects before their parent surfaces so queued
+        // upstream events cannot target freed ResourceData during teardown.
+        const release_order = [_]types.ResourceKind{
+            .subsurface,
+            .xdg_popup,
+            .xdg_toplevel,
+            .xdg_surface,
+            .xdg_positioner,
+            .pointer,
+            .keyboard,
+            .buffer,
+            .shm_pool,
+            .callback,
+            .region,
+            .surface,
+        };
+        for (release_order) |kind| {
+            for (self.engine.model.resources.items()) |resource| {
+                if (resource.client_id == client_id and resource.kind == kind) {
+                    self.releaseOwnedUpstreamProxy(resource);
+                }
+            }
+        }
+    }
+
+    fn releaseOwnedUpstreamProxy(self: *Server, resource: types.Resource) void {
+        _ = self;
+        const proxy = resource.upstream_proxy orelse return;
+        switch (resource.kind) {
+            .compositor,
+            .subcompositor,
+            .shm,
+            .seat,
+            .output,
+            .xdg_wm_base,
+            .registry,
+            .other,
+            => {},
+
+            .surface => {
+                if (resource.wl_resource != null) wlc.c.wl_surface_destroy(@ptrCast(proxy));
+            },
+            .subsurface => wlc.c.wl_subsurface_destroy(@ptrCast(proxy)),
+            .region => wlc.c.wl_region_destroy(@ptrCast(proxy)),
+            .shm_pool => wlc.c.wl_shm_pool_destroy(@ptrCast(proxy)),
+            .buffer => wlc.c.wl_buffer_destroy(@ptrCast(proxy)),
+            .callback => wlc.c.wl_callback_destroy(@ptrCast(proxy)),
+            .pointer => wlc.c.wl_pointer_destroy(@ptrCast(proxy)),
+            .keyboard => wlc.c.wl_keyboard_destroy(@ptrCast(proxy)),
+            .xdg_positioner => xdgc.c.xdg_positioner_destroy(@ptrCast(proxy)),
+            .xdg_surface => xdgc.c.xdg_surface_destroy(@ptrCast(proxy)),
+            .xdg_toplevel => xdgc.c.xdg_toplevel_destroy(@ptrCast(proxy)),
+            .xdg_popup => xdgc.c.xdg_popup_destroy(@ptrCast(proxy)),
+        }
     }
 
     fn applyEmbedOffset(self: *Server, handle: *ClientHandle, embed_id: types.EmbedId) void {
@@ -709,6 +812,38 @@ test "embed lifecycle effects drain to host callbacks" {
     try std.testing.expectEqual(@as(u32, 9), state.destroyed_id);
     try std.testing.expectEqual(@as(i32, 640), state.width);
     try std.testing.expectEqual(@as(i32, 480), state.height);
+}
+
+test "server embed resize rejects negative sizes and closed handles" {
+    var state = RegistryTestState{};
+    const iface = testHostInterface(&state);
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    const client_id = try s.engine.clientCreate(-1, -1);
+    var handle = ClientHandle{
+        .server = s,
+        .client_id = client_id,
+        .wl_client = null,
+        .display = null,
+    };
+    const parent_resource_id = try s.engine.resourceCreate(client_id, .surface, null, null);
+    const parent_surface_id = try s.engine.surfaceCreate(client_id, parent_resource_id);
+    const embed_id = try s.engine.embedCreate(client_id, parent_surface_id);
+    try s.engine.embedMap(embed_id);
+    s.engine.effects.clear();
+
+    try std.testing.expect(!s.embedResize(&handle, -1, 10));
+    try std.testing.expect(!s.embedResize(&handle, 10, -1));
+    try std.testing.expectEqual(@as(usize, 0), s.engine.effects.count());
+
+    try std.testing.expect(s.embedResize(&handle, 0, 0));
+    const embed = s.engine.model.embeds.get(embed_id).?;
+    try std.testing.expectEqual(@as(i32, 0), embed.width);
+    try std.testing.expectEqual(@as(i32, 0), embed.height);
+
+    handle.close_pending = true;
+    try std.testing.expect(!s.embedResize(&handle, 1, 1));
 }
 
 test "server registers only host-supplied globals" {

@@ -51,6 +51,7 @@ pub fn embedSetSubsurfaceResource(
 }
 
 pub fn embedResize(m: *model_mod.Model, id: types.EmbedId, width: i32, height: i32) !void {
+    if (width < 0 or height < 0) return error.InvalidSize;
     const e = m.embeds.getMutable(id) orelse return error.UnknownEmbed;
     e.width = width;
     e.height = height;
@@ -92,11 +93,15 @@ test "embed create, attach child, resize, destroy" {
     const eid = try embedCreate(&m, cid, parent);
     try embedAttachChild(&m, eid, child);
     try embedResize(&m, eid, 400, 300);
+    try embedResize(&m, eid, 0, 0);
+    try std.testing.expectError(error.InvalidSize, embedResize(&m, eid, -1, 300));
+    try std.testing.expectError(error.InvalidSize, embedResize(&m, eid, 400, -1));
     try embedMap(&m, eid);
 
     const e = m.embeds.get(eid).?;
     try std.testing.expect(e.state == .mapped);
-    try std.testing.expect(e.width == 400);
+    try std.testing.expect(e.width == 0);
+    try std.testing.expect(e.height == 0);
     try std.testing.expect(embedForChildSurface(&m, child).? == eid);
 
     embedDestroy(&m, eid);
