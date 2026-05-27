@@ -3,6 +3,7 @@
 pub const c = @cImport({
     @cInclude("wayland-server.h");
     @cInclude("wayland-server-protocol.h");
+    @cInclude("xdg-shell-server-protocol.h");
 });
 
 pub const wl_client = c.struct_wl_client;

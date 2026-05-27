@@ -29,13 +29,10 @@ complete:
   subsurface-offset callback.
 - `wl_keyboard` forwards keymap, focus, key, modifier, and repeat-info
   events from host-provided seats.
+- stable XDG shell delegates forward `xdg_wm_base`, `xdg_positioner`,
+  `xdg_surface`, `xdg_toplevel`, and `xdg_popup`.
 
 ## Phase 2: Embedded UI working
-
-### `xdg_wm_base`, `xdg_surface`, `xdg_toplevel`, `xdg_popup`
-
-Popup support for plugins that want native menus. Less load-bearing than the
-embed path but a standard expectation of plugin UIs.
 
 ### `wl_output`
 

@@ -14,9 +14,19 @@ scope yet.
 
 ## Build
 
+Build dependencies are Zig, pkg-config, libwayland client/server development
+files, `wayland-scanner`, and `wayland-protocols`.
+
 ```sh
 zig build
 zig build test
+```
+
+The build reads `stable/xdg-shell/xdg-shell.xml` from
+`/usr/share/wayland-protocols` by default. Override that location when needed:
+
+```sh
+zig build -Dwayland-protocols-dir=/path/to/wayland-protocols
 ```
 
 ## Documentation

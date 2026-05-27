@@ -12,6 +12,7 @@ const protocol_runtime = @import("protocol/runtime.zig");
 const wlc = @import("wayland/client.zig");
 const wlp = @import("wayland/protocols.zig");
 const wls = @import("wayland/server.zig");
+const xdgs = @import("wayland/xdg_server.zig");
 
 const sys = @cImport({
     @cInclude("fcntl.h");
@@ -36,6 +37,8 @@ pub const ResourceData = struct {
     upstream_proxy: ?*wlc.wl_proxy,
     pointer_focus_surface: ?*wls.wl_resource = null,
     pointer_focus_upstream_surface: ?*wlp.wl_surface = null,
+    xdg_wm_base_resource: ?*wls.wl_resource = null,
+    xdg_surface_id: ?types.SurfaceId = null,
 };
 
 pub const Server = struct {
@@ -262,6 +265,9 @@ pub const Server = struct {
         if (self.host.getSeat() != null) {
             try self.registerGlobal(&wls.c.wl_seat_interface, 4, registry_bindings.bindSeat);
         }
+        if (self.host.getXdgWmBase() != null) {
+            try self.registerGlobal(&xdgs.c.xdg_wm_base_interface, 7, registry_bindings.bindXdgWmBase);
+        }
     }
 
     fn registerGlobal(
@@ -337,6 +343,7 @@ pub const Server = struct {
 
         const child_resource_id = self.engine.resourceForUpstreamProxy(@ptrCast(child_surface)) orelse return false;
         const child_surface_id = self.engine.surfaceForResource(child_resource_id) orelse return false;
+        self.engine.surfaceAssignRole(child_surface_id, .subsurface) catch return false;
 
         const parent_resource_id = self.engine.resourceCreate(
             handle.client_id,
@@ -472,6 +479,7 @@ const RegistryTestState = struct {
     subcompositor_enabled: bool = false,
     shm_enabled: bool = false,
     seat_enabled: bool = false,
+    xdg_wm_base_enabled: bool = false,
     seat_capabilities: u32 = host_mod.default_seat_capabilities,
 };
 
@@ -504,6 +512,12 @@ fn fakeSeatCapabilities(userdata: ?*anyopaque) callconv(.c) u32 {
     return state.seat_capabilities;
 }
 
+fn fakeXdgWmBase(userdata: ?*anyopaque) callconv(.c) ?*wlp.xdg_wm_base {
+    const state: *RegistryTestState = @ptrCast(@alignCast(userdata.?));
+    if (!state.xdg_wm_base_enabled) return null;
+    return @ptrFromInt(0x5000);
+}
+
 fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
     return .{
         .size = @sizeOf(c_api.WayplugHostInterface),
@@ -513,7 +527,7 @@ fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
         .get_subcompositor = fakeSubcompositor,
         .get_shm = fakeShm,
         .get_seat = fakeSeat,
-        .get_xdg_wm_base = null,
+        .get_xdg_wm_base = fakeXdgWmBase,
         .get_dmabuf = null,
         .get_seat_capabilities = fakeSeatCapabilities,
         .get_seat_name = null,
@@ -699,6 +713,16 @@ test "server registers host-supplied seat global" {
 
     try std.testing.expectEqual(@as(usize, 1), s.globals.items.len);
     try std.testing.expectEqual(@as(u32, 4), wls.c.wl_global_get_version(s.globals.items[0]));
+}
+
+test "server registers host-supplied xdg_wm_base global" {
+    var state = RegistryTestState{ .xdg_wm_base_enabled = true };
+    const iface = testHostInterface(&state);
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    try std.testing.expectEqual(@as(usize, 1), s.globals.items.len);
+    try std.testing.expectEqual(@as(u32, 7), wls.c.wl_global_get_version(s.globals.items[0]));
 }
 
 test "invalid registry bind queues protocol error without resource" {

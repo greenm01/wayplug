@@ -86,6 +86,14 @@ pub const Engine = struct {
         return surface.surfaceForResource(&self.model, resource_id);
     }
 
+    pub fn surfaceAssignRole(self: *Engine, surface_id: types.SurfaceId, role: types.SurfaceRole) !void {
+        try surface.assignRole(&self.model, surface_id, role);
+    }
+
+    pub fn surfaceRole(self: *const Engine, surface_id: types.SurfaceId) ?types.SurfaceRole {
+        return surface.surfaceRole(&self.model, surface_id);
+    }
+
     pub fn bufferCreate(self: *Engine, client_id: types.ClientId, resource_id: types.ResourceId) !types.BufferId {
         return buffer.bufferCreate(&self.model, client_id, resource_id);
     }

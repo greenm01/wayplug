@@ -35,12 +35,19 @@ pub const protocol = struct {
     pub const pointer = @import("protocol/pointer.zig");
     pub const keyboard = @import("protocol/keyboard.zig");
     pub const output = @import("protocol/output.zig");
+    pub const xdg_wm_base = @import("protocol/xdg_wm_base.zig");
+    pub const xdg_positioner = @import("protocol/xdg_positioner.zig");
+    pub const xdg_surface = @import("protocol/xdg_surface.zig");
+    pub const xdg_toplevel = @import("protocol/xdg_toplevel.zig");
+    pub const xdg_popup = @import("protocol/xdg_popup.zig");
 };
 
 pub const wayland = struct {
     pub const client = @import("wayland/client.zig");
     pub const server = @import("wayland/server.zig");
     pub const protocols = @import("wayland/protocols.zig");
+    pub const xdg_client = @import("wayland/xdg_client.zig");
+    pub const xdg_server = @import("wayland/xdg_server.zig");
 };
 
 comptime {

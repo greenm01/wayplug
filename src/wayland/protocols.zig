@@ -2,6 +2,7 @@
 //! `wayplug_host_interface` getters.
 
 const wlc = @import("client.zig");
+const xdg = @import("xdg_client.zig");
 
 pub const wl_compositor = wlc.c.struct_wl_compositor;
 pub const wl_subcompositor = wlc.c.struct_wl_subcompositor;
@@ -17,8 +18,13 @@ pub const wl_pointer = wlc.c.struct_wl_pointer;
 pub const wl_keyboard = wlc.c.struct_wl_keyboard;
 pub const wl_output = wlc.c.struct_wl_output;
 
-// Phase 2+ protocols stay opaque until their generated bindings land.
-pub const xdg_wm_base = opaque {};
+pub const xdg_wm_base = xdg.xdg_wm_base;
+pub const xdg_positioner = xdg.xdg_positioner;
+pub const xdg_surface = xdg.xdg_surface;
+pub const xdg_toplevel = xdg.xdg_toplevel;
+pub const xdg_popup = xdg.xdg_popup;
+
+// Later protocols stay opaque until their generated bindings land.
 pub const zwp_linux_dmabuf_v1 = opaque {};
 
 test "opaque types are declared" {

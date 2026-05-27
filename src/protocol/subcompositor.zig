@@ -29,6 +29,9 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
             const subcompositor = H.resourceProxyAs(wlp.wl_subcompositor, resource) orelse return;
             const surface = H.resourceProxyAs(wlp.wl_surface, surface_resource) orelse return;
             const parent = H.resourceProxyAs(wlp.wl_surface, parent_resource) orelse return;
+            const surface_data = H.dataForResource(surface_resource) orelse return;
+            const surface_id = data.server.engine.surfaceForResource(surface_data.resource_id) orelse return;
+            data.server.engine.surfaceAssignRole(surface_id, .subsurface) catch return;
             const subsurface = wlc.c.wl_subcompositor_get_subsurface(subcompositor, surface, parent) orelse return;
             const wl_client = client orelse return;
             _ = data.server.createResource(

@@ -67,6 +67,11 @@ pub const ResourceKind = enum {
     pointer,
     keyboard,
     output,
+    xdg_wm_base,
+    xdg_positioner,
+    xdg_surface,
+    xdg_toplevel,
+    xdg_popup,
     registry,
     other,
 };

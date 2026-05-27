@@ -8,6 +8,8 @@ const seat_protocol = @import("seat.zig");
 const shm_protocol = @import("shm.zig");
 const subcompositor_protocol = @import("subcompositor.zig");
 const wls = @import("../wayland/server.zig");
+const xdg_protocol = @import("xdg_wm_base.zig");
+const xdgs = @import("../wayland/xdg_server.zig");
 
 pub const Delegate = struct {};
 
@@ -26,6 +28,7 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
     const seat_bindings = seat_protocol.Bindings(Server, ResourceData);
     const shm_bindings = shm_protocol.Bindings(Server, ResourceData);
     const subcompositor_bindings = subcompositor_protocol.Bindings(Server, ResourceData);
+    const xdg_bindings = xdg_protocol.Bindings(Server, ResourceData);
 
     return struct {
         const invalid_method: u32 = @intCast(wls.c.WL_DISPLAY_ERROR_INVALID_METHOD);
@@ -121,6 +124,30 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
             ) orelse return;
             wls.c.wl_seat_send_capabilities(resource, server.host.getSeatCapabilities());
             if (selected_version >= 2) wls.c.wl_seat_send_name(resource, server.host.getSeatName());
+        }
+
+        pub fn bindXdgWmBase(client: ?*wls.wl_client, data: ?*anyopaque, version: u32, id: u32) callconv(.c) void {
+            const server = H.serverFromData(data) orelse return;
+            const wl_client = client orelse return;
+            const selected_version = selectVersion(version, 7) orelse {
+                server.protocolErrorForClient(wl_client, invalid_method);
+                return;
+            };
+            const wm_base = server.host.getXdgWmBase() orelse {
+                server.protocolErrorForClient(wl_client, implementation_error);
+                return;
+            };
+            const resource = server.createResource(
+                wl_client,
+                .xdg_wm_base,
+                &xdgs.c.xdg_wm_base_interface,
+                selected_version,
+                id,
+                @ptrCast(&xdg_bindings.impl),
+                @ptrCast(wm_base),
+            ) orelse return;
+            const resource_data = H.dataForResource(resource) orelse return;
+            _ = @import("../wayland/xdg_client.zig").c.xdg_wm_base_add_listener(wm_base, &xdg_bindings.listener, resource_data);
         }
     };
 }

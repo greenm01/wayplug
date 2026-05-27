@@ -31,6 +31,11 @@ test "every protocol delegate has a create() that compiles" {
     _ = wayplug.protocol.pointer.create();
     _ = wayplug.protocol.keyboard.create();
     _ = wayplug.protocol.output.create();
+    _ = wayplug.protocol.xdg_wm_base.create();
+    _ = wayplug.protocol.xdg_positioner.create();
+    _ = wayplug.protocol.xdg_surface.create();
+    _ = wayplug.protocol.xdg_toplevel.create();
+    _ = wayplug.protocol.xdg_popup.create();
 }
 
 test "active protocol bindings instantiate against server runtime" {
@@ -42,6 +47,7 @@ test "active protocol bindings instantiate against server runtime" {
     _ = Registry.bindSubcompositor;
     _ = Registry.bindShm;
     _ = Registry.bindSeat;
+    _ = Registry.bindXdgWmBase;
 
     const Compositor = wayplug.protocol.compositor.Bindings(Server, ResourceData);
     _ = Compositor.impl;
@@ -70,6 +76,20 @@ test "active protocol bindings instantiate against server runtime" {
     const Keyboard = wayplug.protocol.keyboard.Bindings(Server, ResourceData);
     _ = Keyboard.impl;
     _ = Keyboard.listener;
+    const XdgWmBase = wayplug.protocol.xdg_wm_base.Bindings(Server, ResourceData);
+    _ = XdgWmBase.impl;
+    _ = XdgWmBase.listener;
+    const XdgPositioner = wayplug.protocol.xdg_positioner.Bindings(Server, ResourceData);
+    _ = XdgPositioner.impl;
+    const XdgSurface = wayplug.protocol.xdg_surface.Bindings(Server, ResourceData);
+    _ = XdgSurface.impl;
+    _ = XdgSurface.listener;
+    const XdgToplevel = wayplug.protocol.xdg_toplevel.Bindings(Server, ResourceData);
+    _ = XdgToplevel.impl;
+    _ = XdgToplevel.listener;
+    const XdgPopup = wayplug.protocol.xdg_popup.Bindings(Server, ResourceData);
+    _ = XdgPopup.impl;
+    _ = XdgPopup.listener;
 }
 
 const RegistryState = struct {
@@ -78,6 +98,7 @@ const RegistryState = struct {
     shm: ?*wlp.wl_shm = null,
     seat: ?*wlp.wl_seat = null,
     seat_capabilities: u32 = 0,
+    xdg_wm_base: ?*wlp.xdg_wm_base = null,
 };
 
 const HostSmokeState = struct {
@@ -86,6 +107,7 @@ const HostSmokeState = struct {
     shm: ?*wlp.wl_shm = null,
     seat: ?*wlp.wl_seat = null,
     seat_capabilities: u32 = 0,
+    xdg_wm_base: ?*wlp.xdg_wm_base = null,
     parent_surface: ?*wlp.wl_surface = null,
     surface_created_count: std.atomic.Value(u32) = .init(0),
     embed_attached: std.atomic.Value(bool) = .init(false),
@@ -147,6 +169,9 @@ fn registryGlobal(
         const seat: *wlp.wl_seat = @ptrCast(bound);
         state.seat = seat;
         _ = wlc.wl_seat_add_listener(seat, &seat_listener, state);
+    } else if (std.mem.eql(u8, interface_name, "xdg_wm_base")) {
+        const bound = wlc.wl_registry_bind(reg, name, &wlc.xdg_wm_base_interface, @min(version, 7)) orelse return;
+        state.xdg_wm_base = @ptrCast(bound);
     }
 }
 
@@ -183,6 +208,11 @@ fn hostShm(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_shm {
 fn hostSeat(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_seat {
     const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return null));
     return state.seat;
+}
+
+fn hostXdgWmBase(userdata: ?*anyopaque) callconv(.c) ?*wlp.xdg_wm_base {
+    const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return null));
+    return state.xdg_wm_base;
 }
 
 fn hostSeatCapabilities(userdata: ?*anyopaque) callconv(.c) u32 {
@@ -298,6 +328,7 @@ test "weston headless smoke forwards create attach commit and embed" {
         .shm = host_registry_state.shm,
         .seat = host_registry_state.seat,
         .seat_capabilities = host_registry_state.seat_capabilities,
+        .xdg_wm_base = host_registry_state.xdg_wm_base,
         .parent_surface = parent_surface,
     };
     const iface = wayplug.c_api.WayplugHostInterface{
@@ -308,7 +339,7 @@ test "weston headless smoke forwards create attach commit and embed" {
         .get_subcompositor = hostSubcompositor,
         .get_shm = hostShm,
         .get_seat = hostSeat,
-        .get_xdg_wm_base = null,
+        .get_xdg_wm_base = hostXdgWmBase,
         .get_dmabuf = null,
         .get_seat_capabilities = hostSeatCapabilities,
         .get_seat_name = null,
@@ -337,6 +368,9 @@ test "weston headless smoke forwards create attach commit and embed" {
         try std.testing.expect(plugin_registry_state.seat != null);
         try std.testing.expect((plugin_registry_state.seat_capabilities & wlc.WL_SEAT_CAPABILITY_POINTER) != 0);
     }
+    if (host_registry_state.xdg_wm_base != null) {
+        try std.testing.expect(plugin_registry_state.xdg_wm_base != null);
+    }
     const plugin_surface = wlc.wl_compositor_create_surface(plugin_registry_state.compositor.?) orelse return error.CreatePluginSurfaceFailed;
     defer wlc.wl_surface_destroy(plugin_surface);
     try flushDisplay(plugin_display);
@@ -364,7 +398,9 @@ test "weston headless smoke forwards create attach commit and embed" {
     try std.testing.expectEqual(@as(usize, 1), server.engine.model.embeds.count());
     try std.testing.expectEqual(@as(usize, 2), server.engine.model.surfaces.count());
     try std.testing.expectEqual(@as(usize, 1), server.engine.model.buffers.count());
-    const expected_resource_count: usize = if (plugin_registry_state.seat != null) 8 else 7;
+    const expected_resource_count: usize = 7 +
+        @as(usize, if (plugin_registry_state.seat != null) 1 else 0) +
+        @as(usize, if (plugin_registry_state.xdg_wm_base != null) 1 else 0);
     try std.testing.expectEqual(expected_resource_count, server.engine.model.resources.count());
     try std.testing.expectEqual(@as(c_int, 0), wlc.wl_display_get_error(plugin_display));
     try std.testing.expectEqual(@as(c_int, 0), wlc.wl_display_get_error(host_display));
