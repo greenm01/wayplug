@@ -16,6 +16,7 @@ pub const wl_callback = wlc.c.struct_wl_callback;
 pub const wl_seat = wlc.c.struct_wl_seat;
 pub const wl_pointer = wlc.c.struct_wl_pointer;
 pub const wl_keyboard = wlc.c.struct_wl_keyboard;
+pub const wl_touch = wlc.c.struct_wl_touch;
 pub const wl_output = wlc.c.struct_wl_output;
 
 pub const xdg_wm_base = xdg.xdg_wm_base;

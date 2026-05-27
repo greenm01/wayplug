@@ -34,6 +34,7 @@ pub const protocol = struct {
     pub const seat = @import("protocol/seat.zig");
     pub const pointer = @import("protocol/pointer.zig");
     pub const keyboard = @import("protocol/keyboard.zig");
+    pub const touch = @import("protocol/touch.zig");
     pub const output = @import("protocol/output.zig");
     pub const xdg_wm_base = @import("protocol/xdg_wm_base.zig");
     pub const xdg_positioner = @import("protocol/xdg_positioner.zig");

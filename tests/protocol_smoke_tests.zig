@@ -30,6 +30,7 @@ test "every protocol delegate has a create() that compiles" {
     _ = wayplug.protocol.seat.create();
     _ = wayplug.protocol.pointer.create();
     _ = wayplug.protocol.keyboard.create();
+    _ = wayplug.protocol.touch.create();
     _ = wayplug.protocol.output.create();
     _ = wayplug.protocol.xdg_wm_base.create();
     _ = wayplug.protocol.xdg_positioner.create();
@@ -77,6 +78,9 @@ test "active protocol bindings instantiate against server runtime" {
     const Keyboard = wayplug.protocol.keyboard.Bindings(Server, ResourceData);
     _ = Keyboard.impl;
     _ = Keyboard.listener;
+    const Touch = wayplug.protocol.touch.Bindings(Server, ResourceData);
+    _ = Touch.impl;
+    _ = Touch.listener;
     const Output = wayplug.protocol.output.Bindings(Server, ResourceData);
     _ = Output.impl;
     const XdgWmBase = wayplug.protocol.xdg_wm_base.Bindings(Server, ResourceData);

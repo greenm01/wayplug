@@ -28,6 +28,7 @@ pub fn Helpers(comptime Server: type, comptime ResourceData: type) type {
         pub fn resourceDestroyCallback(resource: ?*wls.wl_resource) callconv(.c) void {
             const data = dataForResource(resource) orelse return;
             data.server.engine.resourceDestroy(data.resource_id);
+            if (@hasDecl(ResourceData, "deinit")) data.deinit(data.server.allocator);
             data.server.allocator.destroy(data);
         }
 

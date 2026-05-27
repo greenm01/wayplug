@@ -89,6 +89,7 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
     const buffer_rid = try engine.resourceCreate(cid, .buffer, null, fakeProxy(0x6000));
     const callback_rid = try engine.resourceCreate(cid, .callback, null, fakeProxy(0x7000));
     const region_rid = try engine.resourceCreate(cid, .region, null, fakeProxy(0x8000));
+    const touch_rid = try engine.resourceCreate(cid, .touch, null, fakeProxy(0x9000));
 
     const parent_sid = try engine.surfaceCreate(cid, parent_rid);
     const child_sid = try engine.surfaceCreate(cid, child_rid);
@@ -117,6 +118,7 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
     try std.testing.expect(!engine.model.resources.contains(buffer_rid));
     try std.testing.expect(!engine.model.resources.contains(callback_rid));
     try std.testing.expect(!engine.model.resources.contains(region_rid));
+    try std.testing.expect(!engine.model.resources.contains(touch_rid));
     try std.testing.expect(engine.model.client_by_wl_client.get(fakeWlClient(0x1000)) == null);
     try std.testing.expect(engine.model.client_by_display.get(fakeDisplay(0x2000)) == null);
     try std.testing.expect(engine.model.resource_by_upstream_proxy.get(fakeProxy(0x5000)) == null);

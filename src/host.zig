@@ -15,7 +15,8 @@ pub const default_seat_name = "wayplug-seat";
 pub const default_seat_capabilities: u32 = @intCast(wls.c.WL_SEAT_CAPABILITY_POINTER);
 pub const supported_seat_capabilities: u32 =
     @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_POINTER)) |
-    @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_KEYBOARD));
+    @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_KEYBOARD)) |
+    @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_TOUCH));
 pub const default_output_make: [*:0]const u8 = "wayplug";
 pub const default_output_model: [*:0]const u8 = "delegated-output";
 pub const default_output_name: [*:0]const u8 = "wayplug-0";

@@ -40,8 +40,13 @@ pub const ResourceData = struct {
     upstream_proxy: ?*wlc.wl_proxy,
     pointer_focus_surface: ?*wls.wl_resource = null,
     pointer_focus_upstream_surface: ?*wlp.wl_surface = null,
+    touch_points: std.AutoArrayHashMapUnmanaged(i32, *wlp.wl_surface) = .empty,
     xdg_wm_base_resource: ?*wls.wl_resource = null,
     xdg_surface_id: ?types.SurfaceId = null,
+
+    pub fn deinit(self: *ResourceData, allocator: std.mem.Allocator) void {
+        self.touch_points.deinit(allocator);
+    }
 };
 
 pub const Server = struct {
@@ -448,6 +453,7 @@ pub const Server = struct {
             .xdg_positioner,
             .pointer,
             .keyboard,
+            .touch,
             .buffer,
             .shm_pool,
             .callback,
@@ -487,6 +493,7 @@ pub const Server = struct {
             .callback => wlc.c.wl_callback_destroy(@ptrCast(proxy)),
             .pointer => wlc.c.wl_pointer_destroy(@ptrCast(proxy)),
             .keyboard => wlc.c.wl_keyboard_destroy(@ptrCast(proxy)),
+            .touch => wlc.c.wl_touch_destroy(@ptrCast(proxy)),
             .xdg_positioner => xdgc.c.xdg_positioner_destroy(@ptrCast(proxy)),
             .xdg_surface => xdgc.c.xdg_surface_destroy(@ptrCast(proxy)),
             .xdg_toplevel => xdgc.c.xdg_toplevel_destroy(@ptrCast(proxy)),
@@ -634,6 +641,19 @@ fn fakeOutputInfo(userdata: ?*anyopaque, info: *c_api.WayplugOutputInfo) callcon
     return true;
 }
 
+fn fakeSubsurfaceOffset(
+    _: ?*anyopaque,
+    x: *i32,
+    y: *i32,
+    _: *wlc.wl_display,
+    _: *wlp.wl_surface,
+    _: *wlp.wl_surface,
+) callconv(.c) bool {
+    x.* = 3;
+    y.* = 4;
+    return true;
+}
+
 fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
     return .{
         .size = @sizeOf(c_api.WayplugHostInterface),
@@ -693,6 +713,14 @@ fn recordEmbedDestroyed(userdata: ?*anyopaque, embed_id: u32) callconv(.c) void 
     const state: *EmbedCallbackTestState = @ptrCast(@alignCast(userdata.?));
     state.destroyed_id = embed_id;
     state.destroyed_calls += 1;
+}
+
+fn fakeClientDisplay(comptime address: usize) *wlc.wl_display {
+    return @ptrFromInt(address);
+}
+
+fn fakeSurface(comptime address: usize) *wlp.wl_surface {
+    return @ptrFromInt(address);
 }
 
 test "Server create and destroy is balanced" {
@@ -764,6 +792,72 @@ test "protocol_error effect drains to host callback" {
     try std.testing.expectEqual(@as(u32, 1), state.calls);
     try std.testing.expectEqual(@as(u32, 77), state.code);
     try std.testing.expect(state.client == opaqueClient(handle));
+}
+
+test "embedded coordinate translation subtracts host subsurface offset" {
+    const iface = c_api.WayplugHostInterface{
+        .size = @sizeOf(c_api.WayplugHostInterface),
+        .version = c_api.abi_version,
+        .userdata = null,
+        .get_compositor = null,
+        .get_subcompositor = null,
+        .get_shm = null,
+        .get_seat = null,
+        .get_xdg_wm_base = null,
+        .get_dmabuf = null,
+        .get_seat_capabilities = null,
+        .get_seat_name = null,
+        .get_output_info = null,
+        .get_subsurface_offset = fakeSubsurfaceOffset,
+        .on_client_connected = null,
+        .on_surface_created = null,
+        .on_client_closed = null,
+        .on_protocol_error = null,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = null,
+    };
+
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    const client_id = try s.engine.clientCreate(-1, -1);
+    const handle = try s.allocator.create(ClientHandle);
+    handle.* = .{
+        .server = s,
+        .client_id = client_id,
+        .wl_client = null,
+        .display = fakeClientDisplay(0x1000),
+    };
+    try s.client_handles.append(s.allocator, handle);
+    defer {
+        for (s.client_handles.items, 0..) |candidate, i| {
+            if (candidate == handle) {
+                _ = s.client_handles.swapRemove(i);
+                break;
+            }
+        }
+        s.allocator.destroy(handle);
+    }
+
+    const parent_surface = fakeSurface(0x2000);
+    const child_surface = fakeSurface(0x3000);
+    const parent_resource_id = try s.engine.resourceCreate(client_id, .surface, null, @ptrCast(parent_surface));
+    const child_resource_id = try s.engine.resourceCreate(client_id, .surface, null, @ptrCast(child_surface));
+    const parent_surface_id = try s.engine.surfaceCreate(client_id, parent_resource_id);
+    const child_surface_id = try s.engine.surfaceCreate(client_id, child_resource_id);
+    const embed_id = try s.engine.embedCreate(client_id, parent_surface_id);
+    try s.engine.embedAttachChild(embed_id, child_surface_id);
+
+    const translated = s.translatePointerCoords(
+        client_id,
+        child_surface,
+        wlc.c.wl_fixed_from_int(12),
+        wlc.c.wl_fixed_from_int(20),
+    );
+
+    try std.testing.expectEqual(wlc.c.wl_fixed_from_int(9), translated.x);
+    try std.testing.expectEqual(wlc.c.wl_fixed_from_int(16), translated.y);
 }
 
 test "embed lifecycle effects drain to host callbacks" {

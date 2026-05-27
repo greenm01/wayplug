@@ -1,10 +1,11 @@
-//! Delegate for wl_seat. Pointer and keyboard forwarding are supported;
-//! touch is intentionally left for a later protocol item.
+//! Delegate for wl_seat. Forwards supported input-device objects from
+//! host-provided seats.
 
 const std = @import("std");
 const keyboard_protocol = @import("keyboard.zig");
 const pointer_protocol = @import("pointer.zig");
 const runtime = @import("runtime.zig");
+const touch_protocol = @import("touch.zig");
 const wlc = @import("../wayland/client.zig");
 const wlp = @import("../wayland/protocols.zig");
 const wls = @import("../wayland/server.zig");
@@ -19,6 +20,7 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
     const H = runtime.Helpers(Server, ResourceData);
     const keyboard_bindings = keyboard_protocol.Bindings(Server, ResourceData);
     const pointer_bindings = pointer_protocol.Bindings(Server, ResourceData);
+    const touch_bindings = touch_protocol.Bindings(Server, ResourceData);
 
     return struct {
         pub const impl = wls.c.struct_wl_seat_interface{
@@ -74,8 +76,27 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
             _ = wlc.c.wl_keyboard_add_listener(keyboard, &keyboard_bindings.listener, keyboard_data);
         }
 
-        fn seatGetTouch(_: ?*wls.wl_client, resource: ?*wls.wl_resource, _: u32) callconv(.c) void {
-            postMissingCapability(resource);
+        fn seatGetTouch(client: ?*wls.wl_client, resource: ?*wls.wl_resource, id: u32) callconv(.c) void {
+            const data = H.dataForResource(resource) orelse return;
+            if (!hasCapability(data, wls.c.WL_SEAT_CAPABILITY_TOUCH)) {
+                postMissingCapability(resource);
+                return;
+            }
+            const seat = H.resourceProxyAs(wlp.wl_seat, resource) orelse return;
+            const touch = wlc.c.wl_seat_get_touch(seat) orelse return;
+            const wl_client = client orelse return;
+            const version: u32 = @intCast(wls.c.wl_resource_get_version(data.wl_resource));
+            const touch_resource = data.server.createResource(
+                wl_client,
+                .touch,
+                &wls.c.wl_touch_interface,
+                version,
+                id,
+                @ptrCast(&touch_bindings.impl),
+                @ptrCast(touch),
+            ) orelse return;
+            const touch_data = H.dataForResource(touch_resource) orelse return;
+            _ = wlc.c.wl_touch_add_listener(touch, &touch_bindings.listener, touch_data);
         }
 
         fn postMissingCapability(resource: ?*wls.wl_resource) void {

@@ -66,6 +66,7 @@ pub const ResourceKind = enum {
     seat,
     pointer,
     keyboard,
+    touch,
     output,
     xdg_wm_base,
     xdg_positioner,

@@ -33,15 +33,11 @@ complete:
   `xdg_surface`, `xdg_toplevel`, and `xdg_popup`.
 - `wl_output` forwards a host-provided output metadata snapshot so plugins
   can receive scale and mode information.
+- `wl_touch` forwards multi-touch streams from host-provided seats, including
+  embedded-surface coordinate translation.
 - the embedded editor session lifecycle is formalized around
   client-scoped attach, resize, and teardown, with attach allowed from
   `on_surface_created`.
-
-## Phase 2: Embedded UI working
-
-### `wl_touch`
-
-Forward touch input from host-provided seats.
 
 ## Tests and CI
 
