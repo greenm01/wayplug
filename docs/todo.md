@@ -41,11 +41,12 @@ The first inline delegate pass landed in `server.zig`: `wl_compositor`,
 initial forwarding. Remaining Phase 1 work should make this maintainable
 and prove the flow against a compositor.
 
-### Split inline delegates into `src/protocol/`
+### ~~Split inline delegates into `src/protocol/`~~
 
-Move the delegate implementation currently concentrated in `server.zig`
-into the existing `src/protocol/*.zig` modules. Keep `server.zig` as the
-runtime owner and registration coordinator, and keep lifecycle mutation
+Done: the delegate implementations moved into the existing
+`src/protocol/*.zig` modules, with shared runtime casts/resource cleanup
+in `src/protocol/runtime.zig`. `server.zig` remains the display/client
+owner and registration coordinator, and lifecycle mutation still flows
 through the engine facade.
 
 ### Strengthen registry/global behavior

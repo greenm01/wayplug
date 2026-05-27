@@ -19,6 +19,7 @@ pub const data = struct {
 pub const engine = @import("engine/engine.zig");
 
 pub const protocol = struct {
+    pub const runtime = @import("protocol/runtime.zig");
     pub const server_display = @import("protocol/server_display.zig");
     pub const registry = @import("protocol/registry.zig");
     pub const compositor = @import("protocol/compositor.zig");
