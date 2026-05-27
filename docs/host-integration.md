@@ -148,9 +148,13 @@ static void on_surface_created(void *u, wayembed_client *client,
 `on_surface_created` fires inline during `wl_compositor.create_surface()`,
 after wayembed creates the upstream surface and records it in the model. It
 fires for every plugin surface, before the first commit, and before later
-batched requests on that same plugin dispatch can run. A host may call
-`wayembed_embed_attach()` synchronously inside this callback. Other same-server
-calls from callbacks remain unsupported.
+batched requests on that same plugin dispatch can run. The plugin has not
+attached a buffer or committed the surface when this callback runs. A host may
+call `wayembed_embed_attach()` synchronously inside this callback. Other
+same-server calls from callbacks remain unsupported.
+
+`wayembed_embed_attach()` writes `embed` only when it returns
+`WAYEMBED_EMBED_STATUS_OK`.
 
 Embed callbacks receive the server-owned embed handle:
 
@@ -172,8 +176,9 @@ static void on_embed_destroyed(void *u, wayembed_embed *embed) {
 }
 ```
 
-`wayembed_embed *` is valid until `on_embed_destroyed` returns, or until
-`wayembed_server_destroy()` invalidates all server handles.
+The server issues `wayembed_embed *`. The host may store the pointer, but it
+does not own it. The handle is valid until `on_embed_destroyed` returns, or
+until `wayembed_server_destroy()` starts.
 
 ## Server And Event Loop
 
@@ -263,11 +268,13 @@ into a subsurface of the host parent surface.
 - creates one active `wayembed_embed *` for the client;
 - queues `on_embed_mapped`.
 
-A client may create multiple surfaces, but it may have only one active embed.
-The host may ignore surfaces it does not want to embed; they remain delegated
-surfaces. If the plugin destroys the embedded child surface, wayembed destroys
-the embed and fires `on_embed_destroyed`. The same client may later create
-another surface and attach a new embed.
+Only one active embed per client is supported. A second
+`wayembed_embed_attach()` call while an embed is active returns
+`WAYEMBED_EMBED_STATUS_ALREADY_EMBEDDED`. The host may ignore surfaces it does
+not want to embed; they remain delegated surfaces. If the plugin destroys the
+embedded child surface, wayembed destroys the embed and fires
+`on_embed_destroyed`. The same client may later create another surface and
+attach a new embed.
 
 Attach status codes tell the host what to do:
 
@@ -279,7 +286,7 @@ Attach status codes tell the host what to do:
 | `WAYEMBED_EMBED_STATUS_ALREADY_EMBEDDED` | Reuse or destroy the active embed first. |
 | `WAYEMBED_EMBED_STATUS_UNKNOWN_SURFACE` | Ignore this surface or wait for the next one. |
 | `WAYEMBED_EMBED_STATUS_SURFACE_HAS_ROLE` | The plugin made the surface a toplevel, popup, cursor, or subsurface first. |
-| `WAYEMBED_EMBED_STATUS_UNSUPPORTED` | The host did not expose `wl_subcompositor`. |
+| `WAYEMBED_EMBED_STATUS_UNSUPPORTED` | The host did not provide `get_subcompositor()`, so embedded subsurface mode cannot start. |
 | `WAYEMBED_EMBED_STATUS_UPSTREAM_FAILED` | Log diagnostics and fail the plugin UI. |
 | `WAYEMBED_EMBED_STATUS_UNKNOWN_EMBED` | Drop the stale embed handle. |
 
@@ -307,7 +314,9 @@ void carla_on_window_resize(struct carla_host *h,
 ```
 
 Width and height must be non-negative. Zero is accepted. Resize stores the new
-size in the embed record and reapplies the current subsurface offset.
+size in the embed record and reapplies the current subsurface offset. If resize
+fails and the host cannot recover, log the status and fail or hide the editor
+area.
 
 ## Input, Output, And XDG
 
