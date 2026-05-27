@@ -146,10 +146,11 @@ static void on_surface_created(void *u, wayembed_client *client,
 ```
 
 `on_surface_created` fires inline during `wl_compositor.create_surface()`,
-after wayembed creates the upstream surface and records it in the model. The
-callback fires before later batched requests on that same plugin dispatch can
-run. A host may call `wayembed_embed_attach()` synchronously inside this
-callback. Other same-server calls from callbacks remain unsupported.
+after wayembed creates the upstream surface and records it in the model. It
+fires for every plugin surface, before the first commit, and before later
+batched requests on that same plugin dispatch can run. A host may call
+`wayembed_embed_attach()` synchronously inside this callback. Other same-server
+calls from callbacks remain unsupported.
 
 Embed callbacks receive the server-owned embed handle:
 
@@ -189,6 +190,10 @@ the fd is readable, and calls `wayembed_server_flush(server)` before blocking.
 
 `wayembed_server_dispatch()` fires callbacks before it returns. Host callbacks
 may issue Wayland calls on the host's own upstream connection.
+
+`wayembed_server` is not thread-safe. Serialize every call that touches the
+same server. `wayembed_server_dispatch()` may run on any host thread, and
+callbacks run on that thread. A recursive dispatch call is ignored.
 
 ## Opening A Plugin Display
 
@@ -259,9 +264,10 @@ into a subsurface of the host parent surface.
 - queues `on_embed_mapped`.
 
 A client may create multiple surfaces, but it may have only one active embed.
-If the plugin destroys the embedded child surface, wayembed destroys the embed
-and fires `on_embed_destroyed`. The same client may later create another
-surface and attach a new embed.
+The host may ignore surfaces it does not want to embed; they remain delegated
+surfaces. If the plugin destroys the embedded child surface, wayembed destroys
+the embed and fires `on_embed_destroyed`. The same client may later create
+another surface and attach a new embed.
 
 Attach status codes tell the host what to do:
 
@@ -276,6 +282,10 @@ Attach status codes tell the host what to do:
 | `WAYEMBED_EMBED_STATUS_UNSUPPORTED` | The host did not expose `wl_subcompositor`. |
 | `WAYEMBED_EMBED_STATUS_UPSTREAM_FAILED` | Log diagnostics and fail the plugin UI. |
 | `WAYEMBED_EMBED_STATUS_UNKNOWN_EMBED` | Drop the stale embed handle. |
+
+Other C ABI helpers use `NULL`, `false`, or `-1` for simple failures such as
+invalid arguments or allocation failure. Operations with recovery choices use
+status codes.
 
 ## Resize
 

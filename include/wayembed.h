@@ -108,6 +108,7 @@ typedef struct wayembed_host_interface {
     struct xdg_wm_base *(*get_xdg_wm_base)(void *userdata);
     struct zwp_linux_dmabuf_v1 *(*get_dmabuf)(void *userdata);
 
+    /* display is NULL for fd-opened clients. */
     bool (*get_subsurface_offset)(void *userdata,
                                   int32_t *x,
                                   int32_t *y,
@@ -148,6 +149,9 @@ wayembed_server *wayembed_server_create(const wayembed_host_interface *host,
 void wayembed_server_destroy(wayembed_server *server);
 
 int wayembed_server_get_fd(wayembed_server *server);
+
+/* Dispatches pending server work. Calls for one server must be serialized.
+ * Host callbacks run on the thread that calls this function. */
 void wayembed_server_dispatch(wayembed_server *server);
 void wayembed_server_flush(wayembed_server *server);
 
@@ -178,7 +182,8 @@ struct wl_proxy *wayembed_server_create_proxy(wayembed_server *server,
 void wayembed_server_destroy_proxy(wayembed_server *server,
                                    struct wl_proxy *proxy);
 
-/* Attaches a plugin child surface to a host parent surface. */
+/* Attaches a plugin child surface to a host parent surface.
+ * May be called synchronously from on_surface_created. */
 uint32_t wayembed_embed_attach(const wayembed_embed_attach_info *info,
                                wayembed_embed **out_embed);
 

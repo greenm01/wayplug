@@ -16,6 +16,21 @@ Wayembed never starts a thread. The host owns the event loop. Call
 `wayembed_server_get_fd()`, watch that fd, call `wayembed_server_dispatch()`
 when it becomes readable, and call `wayembed_server_flush()` before blocking.
 
+## Threading Model
+
+`wayembed_server` is not thread-safe. The host must serialize every call that
+touches the same server: `dispatch()`, `flush()`, client open/close calls,
+embed calls, and snapshot calls.
+
+`wayembed_server_dispatch()` may run on any host thread. Callbacks run on the
+thread that called `dispatch()`.
+
+A recursive `wayembed_server_dispatch()` call from a callback is ignored. This
+prevents re-entry into the Wayland event loop.
+
+This matches libwayland's usual `wl_display` threading model: one connection,
+one serialized owner at a time.
+
 ## Host Objects
 
 The host owns the real Wayland objects returned by `wayembed_host_interface`:
@@ -44,8 +59,9 @@ path. For fd-opened clients, it closes wayembed's server-side state. It does
 not close the raw fd returned to the host.
 
 `wayembed_client *` is an opaque handle. The host receives it in callbacks.
-It stays valid until `on_client_closed` fires. After that callback returns,
-the handle is dead.
+For fd-opened clients, `wayembed_server_open_client_fd()` also returns it
+through `out_client`. The handle stays valid until `on_client_closed` returns,
+or until `wayembed_server_destroy()` starts. After that, the handle is dead.
 
 Do not store a client handle past close. Store it only to attach a new embed
 while the client lives.
@@ -57,10 +73,11 @@ protocol stream. Wayembed tracks them so it can forward requests and tear them
 down in order.
 
 The host sees a plugin child surface through `on_surface_created`. That
-callback fires during `wl_compositor.create_surface()`, after wayembed has
-created the upstream surface and model row. The host may pass that pointer to
-`wayembed_embed_attach()` during the callback. It must not destroy that
-surface.
+callback fires for every plugin `wl_compositor.create_surface()` request, after
+wayembed has created the upstream surface and model row. It fires before the
+first commit and before later batched requests in the same dispatch. The host
+may pass that pointer to `wayembed_embed_attach()` during the callback. It must
+not destroy that surface.
 
 Host parent surfaces stay host-owned. Wayembed borrows the parent pointer when
 it creates the embed wiring. Keep the parent alive until the embed dies or the
@@ -104,11 +121,17 @@ points to static library storage. The caller must not free it.
 
 Callbacks fire from `wayembed_server_dispatch()`.
 
-One same-server call is allowed inside callbacks: `wayembed_embed_attach()` from
-`on_surface_created`.
+Allowed same-server calls inside callbacks:
 
-Other same-server calls from callbacks are undefined. Host callbacks may still
-make Wayland calls on the host's own upstream connection.
+| Callback | Allowed same-server calls |
+| --- | --- |
+| `on_surface_created` | `wayembed_embed_attach()` for the surface passed to the callback |
+| `on_embed_mapped`, `on_embed_resized`, `on_embed_destroyed` | handle inspectors such as `wayembed_embed_id()` and `wayembed_embed_client()` |
+| `on_client_connected`, `on_client_closed`, `on_protocol_error` | no same-server calls |
+
+Other same-server calls from callbacks are unsupported. A recursive
+`wayembed_server_dispatch()` call is ignored. Host callbacks may still make
+Wayland calls on the host's own upstream connection.
 
 ## Teardown Order
 

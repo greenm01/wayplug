@@ -75,6 +75,7 @@ pub const Server = struct {
     client_handles: std.ArrayListUnmanaged(*ClientHandle) = .empty,
     embed_handles: std.ArrayListUnmanaged(*EmbedHandle) = .empty,
     globals: std.ArrayListUnmanaged(*wls.wl_global) = .empty,
+    dispatching: bool = false,
 
     pub fn create(
         allocator: std.mem.Allocator,
@@ -129,6 +130,9 @@ pub const Server = struct {
     }
 
     pub fn dispatch(self: *Server) void {
+        if (self.dispatching) return;
+        self.dispatching = true;
+        defer self.dispatching = false;
         _ = wls.c.wl_event_loop_dispatch(self.event_loop, 0);
         self.drainEffects();
     }
@@ -676,9 +680,7 @@ pub const Server = struct {
         const parent = self.surfaceForModelId(embed.host_parent_surface_id) orelse return;
         var x: i32 = 0;
         var y: i32 = 0;
-        if (handle.display) |display| {
-            _ = self.host.getSubsurfaceOffset(&x, &y, display, parent, child);
-        }
+        _ = self.host.getSubsurfaceOffset(&x, &y, handle.display, parent, child);
         wlc.c.wl_subsurface_set_position(@ptrCast(subsurface_proxy), x, y);
     }
 
@@ -712,13 +714,12 @@ pub const Server = struct {
         const embed_id = self.engine.model.embed_by_child_surface.get(child_surface_id) orelse return translated;
         const embed = self.engine.model.embeds.get(embed_id) orelse return translated;
         const handle = self.findClientHandleById(client_id) orelse return translated;
-        const display = handle.display orelse return translated;
         const parent = self.surfaceForModelId(embed.host_parent_surface_id) orelse return translated;
         const child = self.surfaceForModelId(embed.plugin_child_surface_id) orelse return translated;
 
         var offset_x: i32 = 0;
         var offset_y: i32 = 0;
-        if (!self.host.getSubsurfaceOffset(&offset_x, &offset_y, display, parent, child)) return translated;
+        if (!self.host.getSubsurfaceOffset(&offset_x, &offset_y, handle.display, parent, child)) return translated;
         translated.x -= wlc.c.wl_fixed_from_int(offset_x);
         translated.y -= wlc.c.wl_fixed_from_int(offset_y);
         return translated;
@@ -823,7 +824,7 @@ fn fakeSubsurfaceOffset(
     _: ?*anyopaque,
     x: *i32,
     y: *i32,
-    _: *wlc.wl_display,
+    _: ?*wlc.wl_display,
     _: *wlp.wl_surface,
     _: *wlp.wl_surface,
 ) callconv(.c) bool {
@@ -972,6 +973,53 @@ test "protocol_error effect drains to host callback" {
     try std.testing.expect(state.client == opaqueClient(handle));
 }
 
+test "recursive dispatch is ignored" {
+    var state = ProtocolErrorTestState{};
+    const iface = c_api.WayembedHostInterface{
+        .size = @sizeOf(c_api.WayembedHostInterface),
+        .version = c_api.abi_version,
+        .userdata = &state,
+        .get_compositor = null,
+        .get_subcompositor = null,
+        .get_shm = null,
+        .get_seat = null,
+        .get_xdg_wm_base = null,
+        .get_dmabuf = null,
+        .get_seat_capabilities = null,
+        .get_seat_name = null,
+        .get_output_info = null,
+        .get_subsurface_offset = null,
+        .on_client_connected = null,
+        .on_surface_created = null,
+        .on_client_closed = null,
+        .on_protocol_error = recordProtocolError,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = null,
+    };
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    _ = s.openClientDisplay() orelse return error.OpenClientDisplayFailed;
+    const handle = s.client_handles.items[0];
+    s.engine.effects.clear();
+    try s.engine.effects.push(.{
+        .protocol_error = .{
+            .client_id = handle.client_id,
+            .code = 91,
+        },
+    });
+
+    s.dispatching = true;
+    s.dispatch();
+    try std.testing.expectEqual(@as(u32, 0), state.calls);
+
+    s.dispatching = false;
+    s.dispatch();
+    try std.testing.expectEqual(@as(u32, 1), state.calls);
+    try std.testing.expectEqual(@as(u32, 91), state.code);
+}
+
 test "embedded coordinate translation subtracts host subsurface offset" {
     const iface = c_api.WayembedHostInterface{
         .size = @sizeOf(c_api.WayembedHostInterface),
@@ -1037,6 +1085,17 @@ test "embedded coordinate translation subtracts host subsurface offset" {
 
     try std.testing.expectEqual(wlc.c.wl_fixed_from_int(9), translated.x);
     try std.testing.expectEqual(wlc.c.wl_fixed_from_int(16), translated.y);
+
+    handle.display = null;
+    const fd_translated = s.translatePointerCoords(
+        client_id,
+        child_surface,
+        wlc.c.wl_fixed_from_int(12),
+        wlc.c.wl_fixed_from_int(20),
+    );
+
+    try std.testing.expectEqual(wlc.c.wl_fixed_from_int(9), fd_translated.x);
+    try std.testing.expectEqual(wlc.c.wl_fixed_from_int(16), fd_translated.y);
 }
 
 test "embed lifecycle effects drain to host callbacks" {

@@ -155,7 +155,7 @@ pub const WayembedHostInterface = extern struct {
         ?*anyopaque,
         *i32,
         *i32,
-        *wlc.wl_display,
+        ?*wlc.wl_display,
         *wlp.wl_surface,
         *wlp.wl_surface,
     ) callconv(.c) bool,

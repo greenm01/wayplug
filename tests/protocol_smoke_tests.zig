@@ -357,7 +357,7 @@ fn hostSubsurfaceOffset(
     _: ?*anyopaque,
     x: *i32,
     y: *i32,
-    _: *wayembed.wayland.client.wl_display,
+    _: ?*wayembed.wayland.client.wl_display,
     _: *wlp.wl_surface,
     _: *wlp.wl_surface,
 ) callconv(.c) bool {

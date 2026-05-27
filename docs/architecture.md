@@ -267,11 +267,17 @@ Rules:
 - Only `on_surface_created` may call back into the same `wayembed_server`
   instance, and only to attach the new embed. Other callbacks may issue
   Wayland calls on the host's own upstream connection.
+- `on_embed_mapped`, `on_embed_resized`, and `on_embed_destroyed` may call
+  handle inspectors such as `wayembed_embed_id()`.
+- `on_client_connected`, `on_client_closed`, and `on_protocol_error` must not
+  call back into the same server.
 - A null function pointer in the host interface is a no-op.
 - Most host notifications come from the effect queue at the end of each
   dispatch tick. `on_surface_created` fires inline during
   `wl_compositor.create_surface` so the host can attach before later batched
   surface requests run.
+- One server must be called serially. Dispatch may run on any host thread, and
+  callbacks run on the dispatching thread.
 
 ## Event Flow
 

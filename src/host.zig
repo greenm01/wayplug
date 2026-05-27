@@ -84,7 +84,7 @@ pub const Host = struct {
         self: Host,
         x: *i32,
         y: *i32,
-        display: *wlc.wl_display,
+        display: ?*wlc.wl_display,
         parent: *wlp.wl_surface,
         child: *wlp.wl_surface,
     ) bool {

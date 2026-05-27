@@ -179,6 +179,12 @@ At the C ABI boundary, translate errors into C-compatible results:
 - negative `int` values for fd/status failures
 - explicit diagnostic callbacks or snapshots for detailed errors
 
+Use status codes when the caller has a meaningful recovery choice. Embed
+attach and resize use status codes because a host must distinguish stale
+handles, role conflicts, missing host protocol support, and upstream failures.
+Keep `bool`, `null`, or `-1` for narrow helpers where the caller can only stop
+or retry later.
+
 Do not expose Zig error unions through the public C header.
 
 Inside protocol callbacks, avoid panics for client-triggered protocol errors.

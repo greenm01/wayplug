@@ -182,10 +182,12 @@ protocol_error(client_id, code)
 diagnostics_dirty
 ```
 
-`protocol_error` is surfaced through `on_protocol_error`. Embed lifecycle
-effects are surfaced through the embed callbacks. Use `wayembed_embed_id()` to
-key log lines. For a normal plugin disconnect, `embed_destroyed` is delivered
-before `client_closed` for the owning client.
+`protocol_error` is surfaced through `on_protocol_error`. This callback reports
+Wayland protocol errors recorded by delegates; it is not the failure path for
+ordinary host API calls that return `false`, `NULL`, `-1`, or an embed status
+code. Embed lifecycle effects are surfaced through the embed callbacks. Use
+`wayembed_embed_id()` to key log lines. For a normal plugin disconnect,
+`embed_destroyed` is delivered before `client_closed` for the owning client.
 
 ## Developer and Agent Debugging Evidence
 

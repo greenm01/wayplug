@@ -60,6 +60,7 @@ typedef struct wayembed_host_interface {
     struct xdg_wm_base *(*get_xdg_wm_base)(void *userdata);
     struct zwp_linux_dmabuf_v1 *(*get_dmabuf)(void *userdata);
 
+    /* display is NULL for fd-opened clients. */
     bool (*get_subsurface_offset)(void *userdata,
                                   int32_t *x,
                                   int32_t *y,
