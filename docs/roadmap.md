@@ -65,8 +65,9 @@ Initial smoke coverage:
 - Carla- and Element-oriented integration notes for host-owned plugin glue.
 - Element CLAP proof: opt-in host spike proves the adapter token and display
   handoff while XEmbed remains the default. Visible embedding has its own
-  runtime gate and now reports the JUCE 8.0.12 blocker: no parent `wl_surface`
-  is exposed to Element.
+  runtime gate. Stock JUCE 8.0.12 still lacks parent `wl_surface` access, but
+  the `greenm01/JUCE` `wayland-juce8` fork exposes the Wayland peer state that
+  Element needs for `wayembed_embed_attach()`.
 
 ## Phase 4: Performance and Completeness
 

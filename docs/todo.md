@@ -46,9 +46,10 @@ current Phase 2 embedded UI path are complete:
 - Element has an opt-in CLAP spike that keeps XEmbed as the default and proves
   the adapter token/display handoff path without mapping pixels.
 - Element now has a second opt-in visible-embed gate
-  (`ELEMENT_WAYEMBED_CLAP_EMBED=1`). The first spike pass confirms the current
-  blocker: JUCE 8.0.12's Linux peer exposes an X11 native window, not the
-  Wayland `wl_surface` and globals that `wayembed_embed_attach()` needs.
+  (`ELEMENT_WAYEMBED_CLAP_EMBED=1`). Stock JUCE 8.0.12 still exposes an X11
+  native window on Linux, but the `greenm01/JUCE` `wayland-juce8` branch now
+  exposes the parent `wl_surface` and globals Element needs to call
+  `wayembed_embed_attach()`.
 - GitHub Actions runs the pinned Zig formatter, default test suite, and a
   required Weston smoke path on Linux.
 
@@ -93,10 +94,10 @@ plugin fixture, so the display handoff is proven outside Nim too. Host-facing
 notes describe the Carla/Element-shaped glue path. Element now carries the
 first opt-in real-host CLAP spike: it accepts the wayembed token, passes the
 display handoff through `clap_plugin_gui.set_parent()`, and leaves XEmbed as
-the default. The visible-embed path is now gated separately and logs a clear
-blocker when the host parent `wl_surface` is unavailable. Full CLAP/LV2
-runtime helpers and a JUCE or host API that exposes a parent `wl_surface`
-remain future work.
+the default. The visible-embed path is now gated separately and can consume the
+Wayland peer handles exposed by the `wayland-juce8` JUCE fork. Full CLAP/LV2
+runtime helpers, stock-JUCE support, and wider host-toolkit APIs remain future
+work.
 
 ### Linux dmabuf
 

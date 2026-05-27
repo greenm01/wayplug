@@ -280,10 +280,11 @@ under that layer, not replace it.
 The Element CLAP spike is the first real-host proof. It stays opt-in and does
 not replace Element's XEmbed path. The spike proves the adapter token, display
 handoff, and CLAP callback order. Visible embedding has a second runtime gate,
-`ELEMENT_WAYEMBED_CLAP_EMBED=1`. With JUCE 8.0.12 on Linux, that path logs a
-blocker because the peer exposes an X11 native window instead of a Wayland
-`wl_surface`. Full embedding still depends on Element or JUCE exposing the host
-parent `wl_surface` and the host Wayland globals.
+`ELEMENT_WAYEMBED_CLAP_EMBED=1`. Stock JUCE 8.0.12 on Linux still exposes an
+X11 native window instead of a Wayland `wl_surface`, so Element logs that as a
+blocker. When Element is built against the `greenm01/JUCE` `wayland-juce8`
+fork with JUCE's Wayland backend enabled, the peer exposes the parent
+`wl_surface` and host Wayland globals that `wayembed_embed_attach()` needs.
 
 For CLAP, the host opens a wayembed display before GUI creation, initializes a
 `WAYEMBED_ADAPTER_FORMAT_CLAP` handoff, and passes
@@ -302,7 +303,7 @@ client fd, and `on_client_closed` clears the host's per-editor state.
 
 Do not synthesize a parent surface for an X11-only host window. An XWayland
 window is not a Wayland subsurface parent. Keep the display handoff proof alive
-and report the missing parent `wl_surface` until the host toolkit exposes one.
+and report the missing parent `wl_surface` unless the host toolkit exposes one.
 
 ## Embedded Surface Contract
 
