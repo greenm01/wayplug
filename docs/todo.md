@@ -83,8 +83,10 @@ Per [roadmap.md](roadmap.md) Phase 3. The core stays format-neutral; the
 first experimental handoff contract lives in `include/wayembed_adapters.h`
 and [adapter-contract.md](adapter-contract.md). `wayembed-sandbox` is the
 current proof harness. Host-facing notes now describe the Carla/Element-shaped
-glue path. Full CLAP/LV2 runtime helpers and real host integrations remain
-future work.
+glue path. The next real-host proof is an opt-in Element CLAP spike that checks
+the adapter token and display handoff while keeping XEmbed as the default.
+Full CLAP/LV2 runtime helpers and visible real-host embedding remain future
+work.
 
 ### Linux dmabuf
 
