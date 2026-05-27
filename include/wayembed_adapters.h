@@ -33,6 +33,17 @@ typedef struct wayembed_adapter_handoff {
     void *format_userdata;
 } wayembed_adapter_handoff;
 
+typedef struct wayembed_adapter_fd_handoff {
+    uint32_t size;
+    uint32_t version;
+    uint32_t format;
+    wayembed_server *server;
+    wayembed_client *client;
+    int32_t client_fd;
+    const char *format_token;
+    void *format_userdata;
+} wayembed_adapter_fd_handoff;
+
 typedef struct wayembed_adapter_resize {
     uint32_t size;
     uint32_t version;
@@ -49,6 +60,14 @@ bool wayembed_adapter_handoff_init(wayembed_adapter_handoff *handoff,
                                   struct wl_display *display);
 
 bool wayembed_adapter_handoff_validate(const wayembed_adapter_handoff *handoff);
+
+bool wayembed_adapter_fd_handoff_init(wayembed_adapter_fd_handoff *handoff,
+                                     uint32_t format,
+                                     wayembed_server *server,
+                                     wayembed_client *client,
+                                     int32_t client_fd);
+
+bool wayembed_adapter_fd_handoff_validate(const wayembed_adapter_fd_handoff *handoff);
 
 bool wayembed_adapter_resize_validate(const wayembed_adapter_resize *resize);
 

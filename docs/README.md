@@ -9,6 +9,7 @@
 - [Host Integration](host-integration.md) — Carla-style end-to-end walkthrough
 - [Lifetime Rules](lifetime.md) — ownership and teardown rules
 - [Experimental Adapter Contract](adapter-contract.md) — Phase 3 CLAP/LV2/VST3 handoff contract
+- [VST3 Wayland Notes](vst3.md) — implications of VST3 3.8 Wayland support
 - [Logging](logging.md) — host-side lifecycle logging and diagnostics
 
 ## Context

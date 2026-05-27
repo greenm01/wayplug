@@ -396,6 +396,62 @@ int main(void)
         wayembed_server_destroy(server);
         return 42;
     }
+    wayembed_adapter_fd_handoff fd_handoff;
+    fd_handoff.size = sizeof(fd_handoff);
+    fd_handoff.version = 0;
+    fd_handoff.format = WAYEMBED_ADAPTER_FORMAT_UNKNOWN;
+    fd_handoff.server = NULL;
+    fd_handoff.client = NULL;
+    fd_handoff.client_fd = -1;
+    fd_handoff.format_token = NULL;
+    fd_handoff.format_userdata = NULL;
+    if (wayembed_adapter_fd_handoff_validate(NULL)) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 42;
+    }
+    if (!wayembed_adapter_fd_handoff_init(&fd_handoff,
+        WAYEMBED_ADAPTER_FORMAT_CLAP,
+        server,
+        fd_client,
+        client_fd)) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 42;
+    }
+    if (!wayembed_adapter_fd_handoff_validate(&fd_handoff) ||
+        fd_handoff.version != WAYEMBED_ADAPTER_ABI_VERSION ||
+        fd_handoff.format != WAYEMBED_ADAPTER_FORMAT_CLAP ||
+        fd_handoff.client != fd_client ||
+        fd_handoff.client_fd != client_fd ||
+        fd_handoff.format_token == NULL ||
+        strcmp(fd_handoff.format_token, WAYEMBED_ADAPTER_CLAP_EXPERIMENTAL_API) != 0) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 42;
+    }
+    fd_handoff.format_token = WAYEMBED_ADAPTER_LV2_EXPERIMENTAL_URI;
+    if (wayembed_adapter_fd_handoff_validate(&fd_handoff)) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 42;
+    }
+    if (!wayembed_adapter_fd_handoff_init(&fd_handoff,
+        WAYEMBED_ADAPTER_FORMAT_VST3,
+        server,
+        fd_client,
+        client_fd) ||
+        !wayembed_adapter_fd_handoff_validate(&fd_handoff)) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 42;
+    }
+    fd_handoff.version = WAYEMBED_ADAPTER_ABI_VERSION + 1u;
+    if (wayembed_adapter_fd_handoff_validate(&fd_handoff)) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 42;
+    }
     wayembed_server_dispatch(server);
     if (connected_count != 2 || last_client != fd_client) {
         close(client_fd);

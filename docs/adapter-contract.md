@@ -12,12 +12,15 @@ small wayembed handoff structs.
 
 The host creates and owns a normal `wayembed_server`:
 
-1. Call `wayembed_server_open_client_display()` when the plugin UI is about
-   to be created.
+1. Call `wayembed_server_open_client_display()` for an in-process plugin UI,
+   or `wayembed_server_open_client_fd()` for a plugin UI that connects through
+   a process or IPC boundary.
 2. Fill a `wayembed_adapter_handoff` with
-   `wayembed_adapter_handoff_init()`.
-3. Pass `handoff.display` and `handoff.format_token` through the plugin
-   format's experimental Wayland UI path.
+   `wayembed_adapter_handoff_init()`, or fill a
+   `wayembed_adapter_fd_handoff` with `wayembed_adapter_fd_handoff_init()`.
+3. Pass `handoff.display` or `handoff.client_fd`, plus
+   `handoff.format_token`, through the plugin format's experimental Wayland UI
+   path.
 4. In `on_surface_created`, attach the plugin child surface with
    `wayembed_embed_attach()` and store the returned `wayembed_embed *`.
 5. On host-side editor resize, validate the new size with
@@ -29,9 +32,13 @@ The adapter structs are descriptive. They do not own the display, server,
 client, or surfaces. Existing wayembed ownership rules stay in
 `wayembed.h`.
 
-The starter adapter handoff is display-oriented. Hosts that need a separate
-plugin process should use `wayembed_server_open_client_fd()` in their
-format-specific glue and pass the fd through that process contract.
+The display handoff is for plugins that run in the host process and can accept
+a `wl_display *`. The fd handoff is for plugins that must connect from another
+process or through IPC. In both cases the host owns the format glue.
+
+`wayembed_adapter_fd_handoff` carries `server`, `client`, and `client_fd` so
+host glue can keep the handoff tied to a live wayembed client. Only the fd is a
+process payload. Do not marshal `server` or `client` into another process.
 
 ## Proven Paths
 
@@ -39,7 +46,7 @@ The Phase 3 proof lives in
 [wayembed-sandbox](https://github.com/greenm01/wayembed-sandbox). It is a
 Nim host on purpose: it proves the C ABI from outside C and Zig.
 
-The sandbox covers nine paths:
+The sandbox covers ten paths:
 
 - `abi-smoke` checks adapter handoff and resize validation from Nim.
 - `embed-smoke` opens a live host surface, creates one plugin surface, and
@@ -56,6 +63,8 @@ The sandbox covers nine paths:
   `WaylandSurfaceID` handoff order.
 - `vst3-c-plugin-smoke` passes the VST3 display handoff into the C Wayland
   plugin fixture and embeds the fixture-created surface.
+- `adapter-fd-c-plugin-smoke` repeats the C fixture path through fd-backed
+  CLAP, LV2, and VST3 handoffs.
 
 Element carries the first opt-in real-host CLAP proof. Its wayembed spike is
 off by default, leaves the XEmbed path intact, and checks that the experimental
@@ -75,8 +84,8 @@ wayembed does not load plugins, scan bundles, negotiate CLAP extensions, build
 LV2 feature arrays, instantiate VST3 components, or call plugin UI entry points.
 The host already owns those jobs.
 
-The adapter contract gives that host a small Wayland payload: a display, a
-format token or URI, and resize validation. The host decides when a plugin UI
+The adapter contract gives that host a small Wayland payload: a display or fd,
+a format token or URI, and resize validation. The host decides when a plugin UI
 starts, how the format-native object carries the payload, and when teardown
 begins.
 
@@ -100,7 +109,8 @@ A CLAP-shaped host should:
 
 - open a wayembed client display before `clap_plugin_gui.create()`;
 - pass `handoff.format_token` as the API name and `handoff.display` as the
-  Wayland display payload in its experimental glue;
+  Wayland display payload in its experimental glue, or pass
+  `fd_handoff.client_fd` through host-owned IPC for out-of-process UIs;
 - map plugin resize requests to `wayembed_adapter_resize` plus
   `wayembed_embed_resize()` on the active embed handle.
 
@@ -119,7 +129,7 @@ An LV2-shaped host should:
 
 - advertise the wayembed URI only to UIs that explicitly opt in;
 - pass the wayembed display through an LV2 feature payload owned by the
-  host;
+  host, or pass the fd through the host's process boundary;
 - keep the actual wayembed calls in host code, not in the core library.
 
 ## VST3 Mapping
@@ -129,7 +139,8 @@ platform type. It maps to the VST3 3.8 Wayland `WaylandSurfaceID` path.
 
 A VST3-shaped host should:
 
-- expose its wayembed display through a host-side Wayland connection object;
+- expose its wayembed display or fd through a host-side Wayland connection
+  object;
 - pass the host parent `wl_surface` through `IPlugView::attached()` with
   `WaylandSurfaceID`;
 - map VST3 resize requests to `wayembed_adapter_resize` plus
@@ -146,7 +157,7 @@ For a Carla-style host, the adapter layer is thin:
 - the Carla plugin-format layer chooses the CLAP token, LV2 URI, or VST3
   platform type;
 - the existing host integration path creates the server and opens the
-  client display;
+  client display or fd;
 - `on_surface_created` still calls `wayembed_embed_attach()` with Carla's
   editor parent surface and stores the returned embed handle;
 - Carla window resize still updates host editor dimensions and calls

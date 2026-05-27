@@ -252,12 +252,26 @@ int plugin_fd = wayembed_server_open_client_fd(server, &plugin_client);
 if (plugin_fd < 0 || !plugin_client) {
     return CLAP_WINDOW_API_FAILED;
 }
+
+wayembed_adapter_fd_handoff handoff = {
+    .size = sizeof(handoff),
+};
+
+if (!wayembed_adapter_fd_handoff_init(&handoff,
+                                      WAYEMBED_ADAPTER_FORMAT_CLAP,
+                                      server,
+                                      plugin_client,
+                                      plugin_fd)) {
+    close(plugin_fd);
+    return CLAP_WINDOW_API_FAILED;
+}
 ```
 
-The host owns `plugin_fd`. Pass it through the plugin format's process or IPC
-glue, then close the fd in the host when that handoff is done. If the plugin
-closes its end or exits, the host must dispatch the wayembed server so
-`on_client_closed` can fire.
+The host owns `plugin_fd`. Pass `handoff.client_fd` through the plugin
+format's process or IPC glue, then close the host-side duplicate when that
+handoff is done. Keep `handoff.server` and `handoff.client` in host memory;
+they are not process payloads. If the plugin closes its end or exits, the host
+must dispatch the wayembed server so `on_client_closed` can fire.
 
 `plugin_client` is live as soon as the call succeeds. Use it to key host-side
 state for the process you launch. `on_client_connected` still fires from

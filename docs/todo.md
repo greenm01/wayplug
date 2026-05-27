@@ -40,10 +40,12 @@ current Phase 2 embedded UI path are complete:
 - the embedded editor session lifecycle is formalized around explicit
   `wayembed_embed *` handles, with attach allowed from `on_surface_created`.
 - Phase 3 has a dependency-free experimental adapter contract for CLAP/LV2/VST3
-  handoff tokens and validated display/resize structs.
+  handoff tokens and validated display, fd, and resize structs.
 - `wayembed-sandbox` proves the Phase 3 C ABI from Nim with CLAP-shaped,
   LV2-shaped, and VST3-shaped handoff order smokes, C fixture handoff smokes,
   and a live embed smoke for both in-process display and raw-fd client handoff.
+  It also runs a shared fd-backed C plugin fixture smoke across CLAP, LV2, and
+  VST3 adapter tokens.
 - Element has an opt-in CLAP spike that keeps XEmbed as the default and proves
   the adapter token/display handoff path without mapping pixels.
 - Element now has a second opt-in visible-embed gate
@@ -90,8 +92,9 @@ Per [roadmap.md](roadmap.md) Phase 4. Defer until lifecycle is stable.
 Per [roadmap.md](roadmap.md) Phase 3. The core stays format-neutral; the
 first experimental handoff contract lives in `include/wayembed_adapters.h`
 and [adapter-contract.md](adapter-contract.md). `wayembed-sandbox` is the
-current proof harness. It now checks CLAP, LV2, and VST3 handoffs against a
-tiny C Wayland plugin fixture, so the display handoff is proven outside Nim too.
+current proof harness. It now checks CLAP, LV2, and VST3 display and fd
+handoffs against a tiny C Wayland plugin fixture, so both handoff shapes are
+proven outside Nim too.
 Host-facing notes describe the Carla/Element-shaped glue path. Element now
 carries the first opt-in real-host CLAP spike: it accepts the wayembed token,
 passes the display handoff through `clap_plugin_gui.set_parent()`, and leaves

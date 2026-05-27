@@ -111,11 +111,17 @@ so free snapshots before server destroy.
 
 ## Adapter Handoffs
 
-`wayembed_adapter_handoff` and `wayembed_adapter_resize` are caller-owned
-structs. Wayembed fills or validates them. It does not keep pointers to them.
+`wayembed_adapter_handoff`, `wayembed_adapter_fd_handoff`, and
+`wayembed_adapter_resize` are caller-owned structs. Wayembed fills or validates
+them. It does not keep pointers to them.
 
 The display inside a handoff follows the plugin display rules. The token string
 points to static library storage. The caller must not free it.
+
+The fd inside `wayembed_adapter_fd_handoff` follows the raw client fd rules:
+the host owns it, passes it through its format-specific handoff, and closes its
+duplicate when done. The `server` and `client` pointers in the fd handoff are
+host-side handles only. Do not send them to a plugin process.
 
 ## Callback Re-Entry
 

@@ -122,6 +122,17 @@ pub const WayembedAdapterHandoff = extern struct {
     format_userdata: ?*anyopaque,
 };
 
+pub const WayembedAdapterFdHandoff = extern struct {
+    size: u32,
+    version: u32,
+    format: u32,
+    server: ?*server_mod.Server,
+    client: ?*wayembed_client,
+    client_fd: i32,
+    format_token: ?[*:0]const u8,
+    format_userdata: ?*anyopaque,
+};
+
 pub const WayembedAdapterResize = extern struct {
     size: u32,
     version: u32,
@@ -294,6 +305,42 @@ export fn wayembed_adapter_handoff_validate(
     if (h.size < @sizeOf(WayembedAdapterHandoff)) return false;
     if (h.version != adapter_abi_version) return false;
     if (h.server == null or h.display == null) return false;
+    const expected_token = adapterToken(h.format) orelse return false;
+    const actual_token = h.format_token orelse return false;
+    return std.mem.eql(u8, std.mem.span(expected_token), std.mem.span(actual_token));
+}
+
+export fn wayembed_adapter_fd_handoff_init(
+    handoff: ?*WayembedAdapterFdHandoff,
+    format: u32,
+    server: ?*server_mod.Server,
+    client: ?*wayembed_client,
+    client_fd: i32,
+) callconv(.c) bool {
+    const out = handoff orelse return false;
+    if (out.size < @sizeOf(WayembedAdapterFdHandoff)) return false;
+    if (server == null or client == null or client_fd < 0) return false;
+    const token = adapterToken(format) orelse return false;
+    out.* = .{
+        .size = @sizeOf(WayembedAdapterFdHandoff),
+        .version = adapter_abi_version,
+        .format = format,
+        .server = server,
+        .client = client,
+        .client_fd = client_fd,
+        .format_token = token,
+        .format_userdata = null,
+    };
+    return true;
+}
+
+export fn wayembed_adapter_fd_handoff_validate(
+    handoff: ?*const WayembedAdapterFdHandoff,
+) callconv(.c) bool {
+    const h = handoff orelse return false;
+    if (h.size < @sizeOf(WayembedAdapterFdHandoff)) return false;
+    if (h.version != adapter_abi_version) return false;
+    if (h.server == null or h.client == null or h.client_fd < 0) return false;
     const expected_token = adapterToken(h.format) orelse return false;
     const actual_token = h.format_token orelse return false;
     return std.mem.eql(u8, std.mem.span(expected_token), std.mem.span(actual_token));
@@ -591,6 +638,46 @@ test "adapter handoff initialization validates inputs" {
 
     handoff.version = adapter_abi_version + 1;
     try std.testing.expect(!wayembed_adapter_handoff_validate(&handoff));
+}
+
+test "adapter fd handoff initialization validates inputs" {
+    var handoff: WayembedAdapterFdHandoff = .{
+        .size = @sizeOf(WayembedAdapterFdHandoff),
+        .version = 0,
+        .format = adapter_format_unknown,
+        .server = null,
+        .client = null,
+        .client_fd = -1,
+        .format_token = null,
+        .format_userdata = null,
+    };
+
+    try std.testing.expect(!wayembed_adapter_fd_handoff_init(null, adapter_format_clap, null, null, -1));
+    try std.testing.expect(!wayembed_adapter_fd_handoff_init(&handoff, adapter_format_unknown, null, null, -1));
+    try std.testing.expect(!wayembed_adapter_fd_handoff_init(&handoff, adapter_format_clap, null, null, -1));
+
+    const server: *server_mod.Server = @ptrFromInt(@alignOf(server_mod.Server));
+    const client: *wayembed_client = @ptrFromInt(@alignOf(server_mod.ClientHandle));
+    try std.testing.expect(!wayembed_adapter_fd_handoff_init(&handoff, adapter_format_clap, server, client, -1));
+    try std.testing.expect(wayembed_adapter_fd_handoff_init(&handoff, adapter_format_clap, server, client, 42));
+    try std.testing.expect(wayembed_adapter_fd_handoff_validate(&handoff));
+    try std.testing.expectEqual(adapter_abi_version, handoff.version);
+    try std.testing.expectEqual(adapter_format_clap, handoff.format);
+    try std.testing.expectEqual(@as(i32, 42), handoff.client_fd);
+
+    handoff.format_token = adapter_lv2_token;
+    try std.testing.expect(!wayembed_adapter_fd_handoff_validate(&handoff));
+
+    try std.testing.expect(wayembed_adapter_fd_handoff_init(&handoff, adapter_format_lv2, server, client, 42));
+    try std.testing.expect(wayembed_adapter_fd_handoff_validate(&handoff));
+    try std.testing.expectEqual(adapter_format_lv2, handoff.format);
+
+    try std.testing.expect(wayembed_adapter_fd_handoff_init(&handoff, adapter_format_vst3, server, client, 42));
+    try std.testing.expect(wayembed_adapter_fd_handoff_validate(&handoff));
+    try std.testing.expectEqual(adapter_format_vst3, handoff.format);
+
+    handoff.version = adapter_abi_version + 1;
+    try std.testing.expect(!wayembed_adapter_fd_handoff_validate(&handoff));
 }
 
 test "adapter resize validation rejects invalid dimensions" {
