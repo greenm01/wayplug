@@ -40,6 +40,8 @@ current Phase 2 embedded UI path are complete:
 - the embedded editor session lifecycle is formalized around
   client-scoped attach, resize, and teardown, with attach allowed from
   `on_surface_created`.
+- Phase 3 has a dependency-free experimental adapter contract for CLAP/LV2
+  handoff tokens and validated display/resize structs.
 - GitHub Actions runs the pinned Zig formatter, default test suite, and a
   required Weston smoke path on Linux.
 
@@ -76,8 +78,10 @@ Per [roadmap.md](roadmap.md) Phase 4. Defer until lifecycle is stable.
 
 ### CLAP and LV2 adapters
 
-Per [roadmap.md](roadmap.md) Phase 3. The core stays format-neutral; adapters
-live in a separate module.
+Per [roadmap.md](roadmap.md) Phase 3. The core stays format-neutral; the
+first experimental handoff contract lives in `include/wayplug_adapters.h`
+and [adapter-contract.md](adapter-contract.md). Full CLAP/LV2 runtime
+helpers and examples remain future work.
 
 ### Linux dmabuf
 

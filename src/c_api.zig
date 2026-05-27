@@ -11,6 +11,12 @@ const wlc = @import("wayland/client.zig");
 const wlp = @import("wayland/protocols.zig");
 
 pub const abi_version: u32 = 1;
+pub const adapter_abi_version: u32 = 1;
+pub const adapter_format_unknown: u32 = 0;
+pub const adapter_format_clap: u32 = 1;
+pub const adapter_format_lv2: u32 = 2;
+const adapter_clap_token = "wayplug.experimental.clap.wayland";
+const adapter_lv2_token = "https://wayplug.org/ns/ext/wayland-ui";
 
 /// Opaque to C callers; really `server_mod.Server` on the Zig side.
 pub const wayplug_server = opaque {};
@@ -51,6 +57,24 @@ pub const WayplugOutputInfo = extern struct {
     scale: i32,
     name: ?[*:0]const u8,
     description: ?[*:0]const u8,
+};
+
+pub const WayplugAdapterHandoff = extern struct {
+    size: u32,
+    version: u32,
+    format: u32,
+    server: ?*server_mod.Server,
+    display: ?*wlc.wl_display,
+    format_token: ?[*:0]const u8,
+    format_userdata: ?*anyopaque,
+};
+
+pub const WayplugAdapterResize = extern struct {
+    size: u32,
+    version: u32,
+    width: i32,
+    height: i32,
+    scale: f64,
 };
 
 const SnapshotHandle = struct {
@@ -170,6 +194,53 @@ fn copyHostField(
 
 export fn wayplug_abi_version() callconv(.c) u32 {
     return abi_version;
+}
+
+export fn wayplug_adapter_abi_version() callconv(.c) u32 {
+    return adapter_abi_version;
+}
+
+export fn wayplug_adapter_handoff_init(
+    handoff: ?*WayplugAdapterHandoff,
+    format: u32,
+    server: ?*server_mod.Server,
+    display: ?*wlc.wl_display,
+) callconv(.c) bool {
+    const out = handoff orelse return false;
+    if (out.size < @sizeOf(WayplugAdapterHandoff)) return false;
+    if (server == null or display == null) return false;
+    const token = adapterToken(format) orelse return false;
+    out.* = .{
+        .size = @sizeOf(WayplugAdapterHandoff),
+        .version = adapter_abi_version,
+        .format = format,
+        .server = server,
+        .display = display,
+        .format_token = token,
+        .format_userdata = null,
+    };
+    return true;
+}
+
+export fn wayplug_adapter_handoff_validate(
+    handoff: ?*const WayplugAdapterHandoff,
+) callconv(.c) bool {
+    const h = handoff orelse return false;
+    if (h.size < @sizeOf(WayplugAdapterHandoff)) return false;
+    if (h.version != adapter_abi_version) return false;
+    if (h.server == null or h.display == null) return false;
+    if (adapterToken(h.format) == null) return false;
+    return h.format_token != null;
+}
+
+export fn wayplug_adapter_resize_validate(
+    resize: ?*const WayplugAdapterResize,
+) callconv(.c) bool {
+    const r = resize orelse return false;
+    if (r.size < @sizeOf(WayplugAdapterResize)) return false;
+    if (r.version != adapter_abi_version) return false;
+    if (r.width < 0 or r.height < 0) return false;
+    return r.scale > 0;
 }
 
 export fn wayplug_server_create(
@@ -313,10 +384,19 @@ fn snapshotHandleConst(snapshot: ?*const wayplug_snapshot) ?*const SnapshotHandl
     return @ptrCast(@alignCast(s));
 }
 
+fn adapterToken(format: u32) ?[*:0]const u8 {
+    return switch (format) {
+        adapter_format_clap => adapter_clap_token,
+        adapter_format_lv2 => adapter_lv2_token,
+        else => null,
+    };
+}
+
 // ===== production code above =====
 
 test "ABI version is stable" {
     try std.testing.expectEqual(@as(u32, 1), wayplug_abi_version());
+    try std.testing.expectEqual(@as(u32, 1), wayplug_adapter_abi_version());
 }
 
 test "Server null-handle is tolerated" {
@@ -326,6 +406,48 @@ test "Server null-handle is tolerated" {
     try std.testing.expect(wayplug_server_snapshot(null) == null);
     wayplug_snapshot_free(null);
     try std.testing.expect(!wayplug_snapshot_get_counts(null, null));
+}
+
+test "adapter handoff initialization validates inputs" {
+    var handoff: WayplugAdapterHandoff = .{
+        .size = @sizeOf(WayplugAdapterHandoff),
+        .version = 0,
+        .format = adapter_format_unknown,
+        .server = null,
+        .display = null,
+        .format_token = null,
+        .format_userdata = null,
+    };
+
+    try std.testing.expect(!wayplug_adapter_handoff_init(null, adapter_format_clap, null, null));
+    try std.testing.expect(!wayplug_adapter_handoff_init(&handoff, adapter_format_unknown, null, null));
+    try std.testing.expect(!wayplug_adapter_handoff_init(&handoff, adapter_format_clap, null, null));
+
+    const server: *server_mod.Server = @ptrFromInt(@alignOf(server_mod.Server));
+    const display: *wlc.wl_display = @ptrFromInt(1);
+    try std.testing.expect(wayplug_adapter_handoff_init(&handoff, adapter_format_clap, server, display));
+    try std.testing.expect(wayplug_adapter_handoff_validate(&handoff));
+    try std.testing.expectEqual(adapter_abi_version, handoff.version);
+    try std.testing.expectEqual(adapter_format_clap, handoff.format);
+
+    handoff.version = adapter_abi_version + 1;
+    try std.testing.expect(!wayplug_adapter_handoff_validate(&handoff));
+}
+
+test "adapter resize validation rejects invalid dimensions" {
+    var resize: WayplugAdapterResize = .{
+        .size = @sizeOf(WayplugAdapterResize),
+        .version = adapter_abi_version,
+        .width = 320,
+        .height = 200,
+        .scale = 1,
+    };
+    try std.testing.expect(wayplug_adapter_resize_validate(&resize));
+    resize.width = -1;
+    try std.testing.expect(!wayplug_adapter_resize_validate(&resize));
+    resize.width = 320;
+    resize.scale = 0;
+    try std.testing.expect(!wayplug_adapter_resize_validate(&resize));
 }
 
 test "snapshot count output validates size and version" {

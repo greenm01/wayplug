@@ -20,6 +20,7 @@ pub fn build(b: *std.Build) void {
         .root_module = wayplug_mod,
     });
     lib.installHeader(b.path("include/wayplug.h"), "wayplug.h");
+    lib.installHeader(b.path("include/wayplug_adapters.h"), "wayplug_adapters.h");
     b.installArtifact(lib);
 
     const test_step = b.step("test", "Run unit and C ABI smoke tests");

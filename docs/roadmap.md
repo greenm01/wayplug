@@ -50,8 +50,10 @@ Initial smoke coverage:
 
 ## Phase 3: Plugin Format Adapters
 
-- Experimental CLAP extension mapping.
-- Experimental LV2 extension mapping.
+- Experimental CLAP extension mapping: starter contract in
+  `include/wayplug_adapters.h`.
+- Experimental LV2 extension mapping: starter contract in
+  `include/wayplug_adapters.h`.
 - Tiny host/plugin examples.
 - Carla-oriented integration notes.
 
