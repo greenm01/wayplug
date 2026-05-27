@@ -23,6 +23,7 @@ struct xdg_wm_base;
 struct zwp_linux_dmabuf_v1;
 
 typedef struct wayplug_server wayplug_server;
+typedef struct wayplug_client wayplug_client;
 
 typedef struct wayplug_host_interface {
     uint32_t size;
@@ -42,6 +43,12 @@ typedef struct wayplug_host_interface {
                                   struct wl_display *display,
                                   struct wl_surface *parent,
                                   struct wl_surface *child);
+
+    void (*on_client_connected)(void *userdata, wayplug_client *client);
+    void (*on_surface_created)(void *userdata,
+                               wayplug_client *client,
+                               struct wl_surface *plugin_child_surface);
+    void (*on_client_closed)(void *userdata, wayplug_client *client);
 } wayplug_host_interface;
 
 uint32_t wayplug_abi_version(void);
@@ -65,6 +72,14 @@ struct wl_proxy *wayplug_server_create_proxy(wayplug_server *server,
 
 void wayplug_server_destroy_proxy(wayplug_server *server,
                                   struct wl_proxy *proxy);
+
+bool wayplug_embed_attach(wayplug_client *client,
+                          struct wl_surface *parent_surface,
+                          struct wl_surface *child_surface);
+
+bool wayplug_embed_resize(wayplug_client *client,
+                          int32_t width,
+                          int32_t height);
 
 #ifdef __cplusplus
 }

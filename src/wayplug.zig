@@ -1,120 +1,65 @@
+//! Root module. Aggregates submodules so the static library has a
+//! single `root_source_file` and integration tests under `tests/` can
+//! `@import("wayplug")` to reach the layers.
+
 const std = @import("std");
 
-pub const c = @cImport({
-    @cInclude("stdint.h");
-});
+pub const c_api = @import("c_api.zig");
+pub const server = @import("server.zig");
+pub const host = @import("host.zig");
+pub const errors = @import("errors.zig");
 
-pub const abi_version: u32 = 1;
-
-pub const wl_compositor = opaque {};
-pub const wl_display = opaque {};
-pub const wl_event_queue = opaque {};
-pub const wl_proxy = opaque {};
-pub const wl_seat = opaque {};
-pub const wl_shm = opaque {};
-pub const wl_subcompositor = opaque {};
-pub const wl_surface = opaque {};
-pub const xdg_wm_base = opaque {};
-pub const zwp_linux_dmabuf_v1 = opaque {};
-
-pub const WayplugHostInterface = extern struct {
-    size: u32,
-    version: u32,
-    userdata: ?*anyopaque,
-
-    get_compositor: ?*const fn (?*anyopaque) callconv(.c) ?*wl_compositor,
-    get_subcompositor: ?*const fn (?*anyopaque) callconv(.c) ?*wl_subcompositor,
-    get_shm: ?*const fn (?*anyopaque) callconv(.c) ?*wl_shm,
-    get_seat: ?*const fn (?*anyopaque) callconv(.c) ?*wl_seat,
-    get_xdg_wm_base: ?*const fn (?*anyopaque) callconv(.c) ?*xdg_wm_base,
-    get_dmabuf: ?*const fn (?*anyopaque) callconv(.c) ?*zwp_linux_dmabuf_v1,
-
-    get_subsurface_offset: ?*const fn (
-        ?*anyopaque,
-        ?*i32,
-        ?*i32,
-        ?*wl_display,
-        ?*wl_surface,
-        ?*wl_surface,
-    ) callconv(.c) bool,
+pub const data = struct {
+    pub const types = @import("data/types.zig");
+    pub const model = @import("data/model.zig");
+    pub const snapshot = @import("data/snapshot.zig");
+    pub const invariants = @import("data/invariants.zig");
 };
 
-const WayplugServer = extern struct {
-    host: *const WayplugHostInterface,
-    queue: ?*wl_event_queue,
+pub const engine = @import("engine/engine.zig");
+
+pub const protocol = struct {
+    pub const server_display = @import("protocol/server_display.zig");
+    pub const registry = @import("protocol/registry.zig");
+    pub const compositor = @import("protocol/compositor.zig");
+    pub const surface = @import("protocol/surface.zig");
+    pub const subcompositor = @import("protocol/subcompositor.zig");
+    pub const subsurface = @import("protocol/subsurface.zig");
+    pub const shm = @import("protocol/shm.zig");
+    pub const shm_pool = @import("protocol/shm_pool.zig");
+    pub const buffer = @import("protocol/buffer.zig");
+    pub const callback = @import("protocol/callback.zig");
+    pub const region = @import("protocol/region.zig");
+    pub const seat = @import("protocol/seat.zig");
+    pub const pointer = @import("protocol/pointer.zig");
+    pub const keyboard = @import("protocol/keyboard.zig");
+    pub const output = @import("protocol/output.zig");
 };
 
-export fn wayplug_abi_version() callconv(.c) u32 {
-    return abi_version;
-}
+pub const wayland = struct {
+    pub const client = @import("wayland/client.zig");
+    pub const server = @import("wayland/server.zig");
+    pub const protocols = @import("wayland/protocols.zig");
+};
 
-export fn wayplug_server_create(
-    host: ?*const WayplugHostInterface,
-    queue: ?*wl_event_queue,
-) callconv(.c) ?*WayplugServer {
-    const valid_host = host orelse return null;
-    if (valid_host.size < @sizeOf(WayplugHostInterface)) return null;
-    if (valid_host.version != abi_version) return null;
-
-    const server = std.heap.c_allocator.create(WayplugServer) catch return null;
-    server.* = .{
-        .host = valid_host,
-        .queue = queue,
-    };
-    return server;
-}
-
-export fn wayplug_server_destroy(server: ?*WayplugServer) callconv(.c) void {
-    const valid_server = server orelse return;
-    std.heap.c_allocator.destroy(valid_server);
-}
-
-export fn wayplug_server_get_fd(server: ?*WayplugServer) callconv(.c) c_int {
+comptime {
+    // Force every submodule to be analyzed so the static library emits
+    // every `export fn` in c_api.zig regardless of which Zig code paths
+    // reference them.
+    _ = c_api;
     _ = server;
-    return -1;
+    _ = host;
+    _ = errors;
+    _ = data;
+    _ = engine;
+    _ = protocol;
+    _ = wayland;
 }
 
-export fn wayplug_server_dispatch(server: ?*WayplugServer) callconv(.c) void {
-    _ = server;
-}
-
-export fn wayplug_server_flush(server: ?*WayplugServer) callconv(.c) void {
-    _ = server;
-}
-
-export fn wayplug_server_open_client_display(server: ?*WayplugServer) callconv(.c) ?*wl_display {
-    _ = server;
-    return null;
-}
-
-export fn wayplug_server_close_client_display(
-    server: ?*WayplugServer,
-    display: ?*wl_display,
-) callconv(.c) bool {
-    _ = server;
-    _ = display;
-    return false;
-}
-
-export fn wayplug_server_create_proxy(
-    server: ?*WayplugServer,
-    client_display: ?*wl_display,
-    host_object: ?*wl_proxy,
-) callconv(.c) ?*wl_proxy {
-    _ = server;
-    _ = client_display;
-    _ = host_object;
-    return null;
-}
-
-export fn wayplug_server_destroy_proxy(
-    server: ?*WayplugServer,
-    proxy: ?*wl_proxy,
-) callconv(.c) void {
-    _ = server;
-    _ = proxy;
-}
-
-test "ABI version is stable" {
-    try std.testing.expectEqual(@as(u32, 1), wayplug_abi_version());
+test {
+    std.testing.refAllDecls(@This());
+    std.testing.refAllDecls(data);
+    std.testing.refAllDecls(engine);
+    std.testing.refAllDecls(protocol);
+    std.testing.refAllDecls(wayland);
 }
