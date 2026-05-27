@@ -1,7 +1,8 @@
-//! Delegate for wl_seat. Pointer support lands first; keyboard and
-//! touch are intentionally left for the following protocol item.
+//! Delegate for wl_seat. Pointer and keyboard forwarding are supported;
+//! touch is intentionally left for a later protocol item.
 
 const std = @import("std");
+const keyboard_protocol = @import("keyboard.zig");
 const pointer_protocol = @import("pointer.zig");
 const runtime = @import("runtime.zig");
 const wlc = @import("../wayland/client.zig");
@@ -16,6 +17,7 @@ pub fn create() Delegate {
 
 pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
     const H = runtime.Helpers(Server, ResourceData);
+    const keyboard_bindings = keyboard_protocol.Bindings(Server, ResourceData);
     const pointer_bindings = pointer_protocol.Bindings(Server, ResourceData);
 
     return struct {
@@ -28,6 +30,10 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
 
         fn seatGetPointer(client: ?*wls.wl_client, resource: ?*wls.wl_resource, id: u32) callconv(.c) void {
             const data = H.dataForResource(resource) orelse return;
+            if (!hasCapability(data, wls.c.WL_SEAT_CAPABILITY_POINTER)) {
+                postMissingCapability(resource);
+                return;
+            }
             const seat = H.resourceProxyAs(wlp.wl_seat, resource) orelse return;
             const pointer = wlc.c.wl_seat_get_pointer(seat) orelse return;
             const wl_client = client orelse return;
@@ -45,8 +51,27 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
             _ = wlc.c.wl_pointer_add_listener(pointer, &pointer_bindings.listener, pointer_data);
         }
 
-        fn seatGetKeyboard(_: ?*wls.wl_client, resource: ?*wls.wl_resource, _: u32) callconv(.c) void {
-            postMissingCapability(resource);
+        fn seatGetKeyboard(client: ?*wls.wl_client, resource: ?*wls.wl_resource, id: u32) callconv(.c) void {
+            const data = H.dataForResource(resource) orelse return;
+            if (!hasCapability(data, wls.c.WL_SEAT_CAPABILITY_KEYBOARD)) {
+                postMissingCapability(resource);
+                return;
+            }
+            const seat = H.resourceProxyAs(wlp.wl_seat, resource) orelse return;
+            const keyboard = wlc.c.wl_seat_get_keyboard(seat) orelse return;
+            const wl_client = client orelse return;
+            const version: u32 = @intCast(wls.c.wl_resource_get_version(data.wl_resource));
+            const keyboard_resource = data.server.createResource(
+                wl_client,
+                .keyboard,
+                &wls.c.wl_keyboard_interface,
+                version,
+                id,
+                @ptrCast(&keyboard_bindings.impl),
+                @ptrCast(keyboard),
+            ) orelse return;
+            const keyboard_data = H.dataForResource(keyboard_resource) orelse return;
+            _ = wlc.c.wl_keyboard_add_listener(keyboard, &keyboard_bindings.listener, keyboard_data);
         }
 
         fn seatGetTouch(_: ?*wls.wl_client, resource: ?*wls.wl_resource, _: u32) callconv(.c) void {
@@ -58,8 +83,12 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
             wls.c.wl_resource_post_error(
                 seat_resource,
                 wls.c.WL_SEAT_ERROR_MISSING_CAPABILITY,
-                "wayplug only exposes wl_pointer on wl_seat",
+                "wayplug does not expose the requested wl_seat capability",
             );
+        }
+
+        fn hasCapability(data: *ResourceData, capability: c_int) bool {
+            return (data.server.host.getSeatCapabilities() & @as(u32, @intCast(capability))) != 0;
         }
     };
 }

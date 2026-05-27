@@ -472,6 +472,7 @@ const RegistryTestState = struct {
     subcompositor_enabled: bool = false,
     shm_enabled: bool = false,
     seat_enabled: bool = false,
+    seat_capabilities: u32 = host_mod.default_seat_capabilities,
 };
 
 fn fakeCompositor(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_compositor {
@@ -498,6 +499,11 @@ fn fakeSeat(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_seat {
     return @ptrFromInt(0x4000);
 }
 
+fn fakeSeatCapabilities(userdata: ?*anyopaque) callconv(.c) u32 {
+    const state: *RegistryTestState = @ptrCast(@alignCast(userdata.?));
+    return state.seat_capabilities;
+}
+
 fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
     return .{
         .size = @sizeOf(c_api.WayplugHostInterface),
@@ -509,6 +515,8 @@ fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
         .get_seat = fakeSeat,
         .get_xdg_wm_base = null,
         .get_dmabuf = null,
+        .get_seat_capabilities = fakeSeatCapabilities,
+        .get_seat_name = null,
         .get_subsurface_offset = null,
         .on_client_connected = null,
         .on_surface_created = null,
@@ -567,6 +575,8 @@ test "Server create and destroy is balanced" {
         .get_seat = null,
         .get_xdg_wm_base = null,
         .get_dmabuf = null,
+        .get_seat_capabilities = null,
+        .get_seat_name = null,
         .get_subsurface_offset = null,
         .on_client_connected = null,
         .on_surface_created = null,
@@ -593,6 +603,8 @@ test "protocol_error effect drains to host callback" {
         .get_seat = null,
         .get_xdg_wm_base = null,
         .get_dmabuf = null,
+        .get_seat_capabilities = null,
+        .get_seat_name = null,
         .get_subsurface_offset = null,
         .on_client_connected = null,
         .on_surface_created = null,
@@ -633,6 +645,8 @@ test "embed lifecycle effects drain to host callbacks" {
         .get_seat = null,
         .get_xdg_wm_base = null,
         .get_dmabuf = null,
+        .get_seat_capabilities = null,
+        .get_seat_name = null,
         .get_subsurface_offset = null,
         .on_client_connected = null,
         .on_surface_created = null,

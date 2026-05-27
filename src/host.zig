@@ -11,6 +11,12 @@ const wlc = @import("wayland/client.zig");
 const wls = @import("wayland/server.zig");
 const wlp = @import("wayland/protocols.zig");
 
+pub const default_seat_name = "wayplug-seat";
+pub const default_seat_capabilities: u32 = @intCast(wls.c.WL_SEAT_CAPABILITY_POINTER);
+pub const supported_seat_capabilities: u32 =
+    @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_POINTER)) |
+    @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_KEYBOARD));
+
 pub const Host = struct {
     iface: *const c_api.WayplugHostInterface,
 
@@ -36,6 +42,19 @@ pub const Host = struct {
     pub fn getSeat(self: Host) ?*wlp.wl_seat {
         const f = self.iface.get_seat orelse return null;
         return f(self.iface.userdata);
+    }
+
+    pub fn getSeatCapabilities(self: Host) u32 {
+        const caps = if (self.iface.get_seat_capabilities) |f|
+            f(self.iface.userdata)
+        else
+            default_seat_capabilities;
+        return caps & supported_seat_capabilities;
+    }
+
+    pub fn getSeatName(self: Host) [*c]const u8 {
+        const f = self.iface.get_seat_name orelse return default_seat_name;
+        return f(self.iface.userdata) orelse default_seat_name;
     }
 
     pub fn getXdgWmBase(self: Host) ?*wlp.xdg_wm_base {
@@ -108,6 +127,8 @@ test "Host wraps a null-callback interface as no-op" {
         .get_seat = null,
         .get_xdg_wm_base = null,
         .get_dmabuf = null,
+        .get_seat_capabilities = null,
+        .get_seat_name = null,
         .get_subsurface_offset = null,
         .on_client_connected = null,
         .on_surface_created = null,
@@ -119,6 +140,40 @@ test "Host wraps a null-callback interface as no-op" {
     };
     const h = Host.init(&iface);
     try std.testing.expect(h.getCompositor() == null);
+    try std.testing.expectEqual(default_seat_capabilities, h.getSeatCapabilities());
+    try std.testing.expectEqualStrings(default_seat_name, std.mem.span(h.getSeatName()));
     h.onClientConnected(null); // must not crash
     h.onEmbedMapped(1); // must not crash
+}
+
+fn noisySeatCapabilities(_: ?*anyopaque) callconv(.c) u32 {
+    return @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_POINTER)) |
+        @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_KEYBOARD)) |
+        @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_TOUCH));
+}
+
+test "Host masks seat capabilities to supported devices" {
+    const iface = c_api.WayplugHostInterface{
+        .size = @sizeOf(c_api.WayplugHostInterface),
+        .version = c_api.abi_version,
+        .userdata = null,
+        .get_compositor = null,
+        .get_subcompositor = null,
+        .get_shm = null,
+        .get_seat = null,
+        .get_xdg_wm_base = null,
+        .get_dmabuf = null,
+        .get_seat_capabilities = noisySeatCapabilities,
+        .get_seat_name = null,
+        .get_subsurface_offset = null,
+        .on_client_connected = null,
+        .on_surface_created = null,
+        .on_client_closed = null,
+        .on_protocol_error = null,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = null,
+    };
+    const h = Host.init(&iface);
+    try std.testing.expectEqual(supported_seat_capabilities, h.getSeatCapabilities());
 }

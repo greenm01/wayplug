@@ -50,6 +50,15 @@ typedef struct wayplug_host_interface {
     void (*on_protocol_error)(void *userdata,
                               wayplug_client *client,
                               uint32_t code);
+    void (*on_embed_mapped)(void *userdata, uint32_t embed_id);
+    void (*on_embed_resized)(void *userdata,
+                             uint32_t embed_id,
+                             int32_t width,
+                             int32_t height);
+    void (*on_embed_destroyed)(void *userdata, uint32_t embed_id);
+
+    uint32_t (*get_seat_capabilities)(void *userdata);
+    const char *(*get_seat_name)(void *userdata);
 } wayplug_host_interface;
 
 wayplug_server *wayplug_server_create(const wayplug_host_interface *host,

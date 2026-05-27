@@ -72,6 +72,9 @@ pub const WayplugHostInterface = extern struct {
     on_embed_mapped: ?*const fn (?*anyopaque, u32) callconv(.c) void,
     on_embed_resized: ?*const fn (?*anyopaque, u32, i32, i32) callconv(.c) void,
     on_embed_destroyed: ?*const fn (?*anyopaque, u32) callconv(.c) void,
+
+    get_seat_capabilities: ?*const fn (?*anyopaque) callconv(.c) u32,
+    get_seat_name: ?*const fn (?*anyopaque) callconv(.c) ?[*:0]const u8,
 };
 
 const minimum_host_interface_size = @offsetOf(WayplugHostInterface, "userdata") +
@@ -99,6 +102,8 @@ pub fn normalizeHostInterface(host: *const WayplugHostInterface) ?WayplugHostInt
     copyHostField(&normalized, host, "on_embed_mapped");
     copyHostField(&normalized, host, "on_embed_resized");
     copyHostField(&normalized, host, "on_embed_destroyed");
+    copyHostField(&normalized, host, "get_seat_capabilities");
+    copyHostField(&normalized, host, "get_seat_name");
     return normalized;
 }
 
@@ -121,6 +126,8 @@ fn emptyHostInterface() WayplugHostInterface {
         .on_embed_mapped = null,
         .on_embed_resized = null,
         .on_embed_destroyed = null,
+        .get_seat_capabilities = null,
+        .get_seat_name = null,
     };
 }
 
@@ -343,6 +350,8 @@ test "host interface normalization accepts older append-only sizes" {
     iface.size = @offsetOf(WayplugHostInterface, "on_protocol_error");
     const normalized = normalizeHostInterface(&iface).?;
     try std.testing.expectEqual(@sizeOf(WayplugHostInterface), normalized.size);
+    try std.testing.expect(normalized.get_seat_capabilities == null);
+    try std.testing.expect(normalized.get_seat_name == null);
     try std.testing.expect(normalized.on_protocol_error == null);
     try std.testing.expect(normalized.on_embed_mapped == null);
     try std.testing.expect(normalized.on_embed_resized == null);

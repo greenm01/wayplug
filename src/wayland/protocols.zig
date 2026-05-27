@@ -14,6 +14,7 @@ pub const wl_buffer = wlc.c.struct_wl_buffer;
 pub const wl_callback = wlc.c.struct_wl_callback;
 pub const wl_seat = wlc.c.struct_wl_seat;
 pub const wl_pointer = wlc.c.struct_wl_pointer;
+pub const wl_keyboard = wlc.c.struct_wl_keyboard;
 pub const wl_output = wlc.c.struct_wl_output;
 
 // Phase 2+ protocols stay opaque until their generated bindings land.

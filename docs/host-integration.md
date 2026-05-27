@@ -87,6 +87,16 @@ static struct wl_seat *get_seat(void *u) {
     return ((struct carla_host *)u)->upstream_seat;
 }
 
+static uint32_t get_seat_capabilities(void *u) {
+    (void)u;
+    return WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD;
+}
+
+static const char *get_seat_name(void *u) {
+    (void)u;
+    return "carla-seat";
+}
+
 static bool get_subsurface_offset(void *u, int32_t *x, int32_t *y,
                                   struct wl_display *display,
                                   struct wl_surface *parent,
@@ -133,6 +143,8 @@ static const wayplug_host_interface host_iface = {
     .get_subcompositor = get_subcompositor,
     .get_shm = get_shm,
     .get_seat = get_seat,
+    .get_seat_capabilities = get_seat_capabilities,
+    .get_seat_name = get_seat_name,
     .get_subsurface_offset = get_subsurface_offset,
 
     .on_client_connected = on_client_connected,

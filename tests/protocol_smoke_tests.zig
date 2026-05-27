@@ -67,6 +67,9 @@ test "active protocol bindings instantiate against server runtime" {
     const Pointer = wayplug.protocol.pointer.Bindings(Server, ResourceData);
     _ = Pointer.impl;
     _ = Pointer.listener;
+    const Keyboard = wayplug.protocol.keyboard.Bindings(Server, ResourceData);
+    _ = Keyboard.impl;
+    _ = Keyboard.listener;
 }
 
 const RegistryState = struct {
@@ -82,6 +85,7 @@ const HostSmokeState = struct {
     subcompositor: ?*wlp.wl_subcompositor = null,
     shm: ?*wlp.wl_shm = null,
     seat: ?*wlp.wl_seat = null,
+    seat_capabilities: u32 = 0,
     parent_surface: ?*wlp.wl_surface = null,
     surface_created_count: std.atomic.Value(u32) = .init(0),
     embed_attached: std.atomic.Value(bool) = .init(false),
@@ -179,6 +183,11 @@ fn hostShm(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_shm {
 fn hostSeat(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_seat {
     const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return null));
     return state.seat;
+}
+
+fn hostSeatCapabilities(userdata: ?*anyopaque) callconv(.c) u32 {
+    const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return 0));
+    return state.seat_capabilities;
 }
 
 fn hostSubsurfaceOffset(
@@ -288,6 +297,7 @@ test "weston headless smoke forwards create attach commit and embed" {
         .subcompositor = host_registry_state.subcompositor,
         .shm = host_registry_state.shm,
         .seat = host_registry_state.seat,
+        .seat_capabilities = host_registry_state.seat_capabilities,
         .parent_surface = parent_surface,
     };
     const iface = wayplug.c_api.WayplugHostInterface{
@@ -300,6 +310,8 @@ test "weston headless smoke forwards create attach commit and embed" {
         .get_seat = hostSeat,
         .get_xdg_wm_base = null,
         .get_dmabuf = null,
+        .get_seat_capabilities = hostSeatCapabilities,
+        .get_seat_name = null,
         .get_subsurface_offset = hostSubsurfaceOffset,
         .on_client_connected = null,
         .on_surface_created = hostSurfaceCreated,

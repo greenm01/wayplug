@@ -27,14 +27,10 @@ complete:
 - embed lifecycle callbacks are exposed as append-only host callbacks.
 - embedded pointer enter/motion coordinates are translated through the host
   subsurface-offset callback.
+- `wl_keyboard` forwards keymap, focus, key, modifier, and repeat-info
+  events from host-provided seats.
 
 ## Phase 2: Embedded UI working
-
-### `wl_keyboard`
-
-Pointer-capable `wl_seat` and `wl_pointer` forwarding exist for embedded
-coordinate translation. Keyboard is next; touch can wait. Per
-[protocol-landscape.md](protocol-landscape.md).
 
 ### `xdg_wm_base`, `xdg_surface`, `xdg_toplevel`, `xdg_popup`
 

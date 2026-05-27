@@ -119,8 +119,8 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
                 @ptrCast(&seat_bindings.impl),
                 @ptrCast(seat),
             ) orelse return;
-            wls.c.wl_seat_send_capabilities(resource, wls.c.WL_SEAT_CAPABILITY_POINTER);
-            if (selected_version >= 2) wls.c.wl_seat_send_name(resource, "wayplug-seat");
+            wls.c.wl_seat_send_capabilities(resource, server.host.getSeatCapabilities());
+            if (selected_version >= 2) wls.c.wl_seat_send_name(resource, server.host.getSeatName());
         }
     };
 }

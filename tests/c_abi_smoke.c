@@ -96,6 +96,8 @@ int main(void)
     host.get_seat = NULL;
     host.get_xdg_wm_base = NULL;
     host.get_dmabuf = NULL;
+    host.get_seat_capabilities = NULL;
+    host.get_seat_name = NULL;
     host.get_subsurface_offset = NULL;
     host.on_client_connected = on_client_connected;
     host.on_surface_created = NULL;
