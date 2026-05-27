@@ -96,15 +96,12 @@ records, and `data/invariants.zig` checks dense table consistency,
 relationship indexes, cross-table references, and stale/dead indexed
 resources.
 
-### Snapshot C ABI
+### ~~Snapshot C ABI~~
 
-Once the snapshot copy is real, expose it through the public header:
-`wayplug_server_snapshot(server)` returns a caller-owned
-`wayplug_snapshot *`; `wayplug_snapshot_free(snapshot)` releases it.
-The snapshot is a point-in-time copy; subsequent ops do not invalidate
-it. Add to `include/wayplug.h` and cover the round-trip in
-`tests/c_abi_smoke.c`. See [logging.md](logging.md) § Planned
-Diagnostics Expansion.
+Done: `wayplug_server_snapshot(server)` returns a caller-owned opaque
+snapshot, `wayplug_snapshot_get_counts()` exposes versioned table counts,
+and `wayplug_snapshot_free()` releases the copy. The C ABI smoke covers
+null handling, size/version validation, and point-in-time count behavior.
 
 ## Phase 2: Embedded UI working
 

@@ -64,6 +64,22 @@ objects during bind surface as `WL_DISPLAY_ERROR_IMPLEMENTATION`.
   every protocol callback for that tick has run. See [Architecture §
   Host Notifications](architecture.md#host-notifications).
 
+## Snapshot API
+
+The public C ABI exposes an allocating diagnostic snapshot:
+
+```c
+wayplug_snapshot *wayplug_server_snapshot(wayplug_server *server);
+bool wayplug_snapshot_get_counts(const wayplug_snapshot *snapshot,
+                                 wayplug_snapshot_counts *counts);
+void wayplug_snapshot_free(wayplug_snapshot *snapshot);
+```
+
+Snapshots are point-in-time copies. Later server operations do not mutate an
+existing snapshot. The caller owns each snapshot and must release it with
+`wayplug_snapshot_free`. The current C view exposes table counts; record-level
+iteration is intentionally left for a later diagnostic schema.
+
 ## Stable Identifiers for Log Lines
 
 Use `wayplug_client *` as the stable key in log output. It is an opaque
@@ -130,14 +146,12 @@ diagnostics_dirty
 ```
 
 `protocol_error` is surfaced through `on_protocol_error`. The remaining
-effects are not yet exposed as callbacks or snapshot API. When they are
-added, the callback struct gains:
+effects are not yet exposed as callbacks. When they are added, the callback
+struct gains:
 
 - `on_embed_mapped` / `on_embed_resized` / `on_embed_destroyed` — embed
   lifecycle, keyed on embed id (a stable `uint32_t` that is not reused in a
   server's lifetime)
-- `wayplug_server_snapshot` / `wayplug_snapshot_free` — allocating
-  diagnostic snapshot of current server state
 
 Until then, embed evidence must be gathered from `on_client_closed` (all
 embeds for a client are torn down before this fires) or from internal
@@ -150,10 +164,10 @@ evidence that can be compared across runs. This matches [AGENTS.md §
 Debugging Evidence](../AGENTS.md#debugging-evidence).
 
 **State snapshots** — take a snapshot of callback-visible state before and
-after the reproducing step. Until `wayplug_server_snapshot` is implemented,
-record manually: current connected clients (tracked in host state), surfaces
-attached, embeds active. Log them at `on_client_connected` and
-`on_client_closed` so the before/after pair is in the log.
+after the reproducing step. Use `wayplug_server_snapshot` plus
+`wayplug_snapshot_get_counts` to record current table counts. Pair these with
+host-tracked details such as surfaces attached or embeds active until
+record-level snapshot iteration lands.
 
 **Client handle** — the `wayplug_client *` value is the most useful
 cross-run key. It is the anchor that ties connect, surface-created, and close

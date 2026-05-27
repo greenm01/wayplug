@@ -24,6 +24,18 @@ struct zwp_linux_dmabuf_v1;
 
 typedef struct wayplug_server wayplug_server;
 typedef struct wayplug_client wayplug_client;
+typedef struct wayplug_snapshot wayplug_snapshot;
+
+typedef struct wayplug_snapshot_counts {
+    uint32_t size;
+    uint32_t version;
+    size_t clients;
+    size_t resources;
+    size_t surfaces;
+    size_t buffers;
+    size_t embeds;
+    size_t outputs;
+} wayplug_snapshot_counts;
 
 typedef struct wayplug_host_interface {
     uint32_t size;
@@ -64,6 +76,11 @@ void wayplug_server_destroy(wayplug_server *server);
 int wayplug_server_get_fd(wayplug_server *server);
 void wayplug_server_dispatch(wayplug_server *server);
 void wayplug_server_flush(wayplug_server *server);
+
+wayplug_snapshot *wayplug_server_snapshot(wayplug_server *server);
+bool wayplug_snapshot_get_counts(const wayplug_snapshot *snapshot,
+                                 wayplug_snapshot_counts *counts);
+void wayplug_snapshot_free(wayplug_snapshot *snapshot);
 
 struct wl_display *wayplug_server_open_client_display(wayplug_server *server);
 bool wayplug_server_close_client_display(wayplug_server *server,

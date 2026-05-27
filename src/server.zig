@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const c_api = @import("c_api.zig");
+const snapshot_mod = @import("data/snapshot.zig");
 const types = @import("data/types.zig");
 const engine_mod = @import("engine/engine.zig");
 const host_mod = @import("host.zig");
@@ -101,6 +102,10 @@ pub const Server = struct {
 
     pub fn flush(self: *Server) void {
         wls.c.wl_display_flush_clients(self.display);
+    }
+
+    pub fn snapshot(self: *Server) !snapshot_mod.Snapshot {
+        return snapshot_mod.snapshot(self.allocator, &self.engine.model);
     }
 
     pub fn openClientDisplay(self: *Server) ?*wlc.wl_display {
