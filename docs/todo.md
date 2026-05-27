@@ -82,11 +82,11 @@ Per [roadmap.md](roadmap.md) Phase 4. Defer until lifecycle is stable.
 Per [roadmap.md](roadmap.md) Phase 3. The core stays format-neutral; the
 first experimental handoff contract lives in `include/wayembed_adapters.h`
 and [adapter-contract.md](adapter-contract.md). `wayembed-sandbox` is the
-current proof harness. Host-facing notes now describe the Carla/Element-shaped
-glue path. The next real-host proof is an opt-in Element CLAP spike that checks
-the adapter token and display handoff while keeping XEmbed as the default.
-Full CLAP/LV2 runtime helpers and visible real-host embedding remain future
-work.
+current proof harness. It now checks a CLAP handoff against a tiny C Wayland
+plugin fixture, so the display handoff is proven outside Nim too. Host-facing
+notes describe the Carla/Element-shaped glue path. The next real-host proof is
+the opt-in Element CLAP spike, with XEmbed still the default. Full CLAP/LV2
+runtime helpers and visible real-host embedding remain future work.
 
 ### Linux dmabuf
 

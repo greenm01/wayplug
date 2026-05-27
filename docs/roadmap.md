@@ -60,6 +60,8 @@ Initial smoke coverage:
   order.
 - Tiny host/plugin examples: `wayembed-sandbox` opens a live host surface and
   embeds one plugin-created surface through the C ABI.
+- C plugin fixture proof: `wayembed-sandbox` passes a CLAP handoff display into
+  C code, then embeds the C-created surface.
 - Carla- and Element-oriented integration notes for host-owned plugin glue.
 - Element CLAP proof: opt-in host spike targets the adapter token and display
   handoff first. Visible embedding waits on parent `wl_surface` access from
