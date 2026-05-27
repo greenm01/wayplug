@@ -296,7 +296,13 @@ For LV2, the host advertises `WAYEMBED_ADAPTER_LV2_EXPERIMENTAL_URI` only to
 UIs that opt in. The LV2 feature payload carries the wayembed display. The host
 keeps ownership of the server, display, and embed handle.
 
-The shared editor path stays the same for both formats: `on_surface_created`
+For VST3, the host uses
+`WAYEMBED_ADAPTER_VST3_PLATFORM_TYPE_WAYLAND_SURFACE_ID` for the VST3 3.8
+Wayland surface path. The host owns VST3 SDK integration and exposes the
+wayembed display through its Wayland host object. The plugin still creates the
+child `wl_surface`.
+
+The shared editor path stays the same for all three formats: `on_surface_created`
 calls `wayembed_embed_attach()` with the host editor parent surface, resize
 calls `wayembed_embed_resize()`, hide or destroy closes the plugin display or
 client fd, and `on_client_closed` clears the host's per-editor state.

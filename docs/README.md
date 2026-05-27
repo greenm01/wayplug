@@ -8,7 +8,7 @@
 - [C ABI Sketch](c-abi-sketch.md) — historical API sketch and ABI rules
 - [Host Integration](host-integration.md) — Carla-style end-to-end walkthrough
 - [Lifetime Rules](lifetime.md) — ownership and teardown rules
-- [Experimental Adapter Contract](adapter-contract.md) — Phase 3 CLAP/LV2 handoff contract
+- [Experimental Adapter Contract](adapter-contract.md) — Phase 3 CLAP/LV2/VST3 handoff contract
 - [Logging](logging.md) — host-side lifecycle logging and diagnostics
 
 ## Context

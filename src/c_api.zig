@@ -15,8 +15,10 @@ pub const adapter_abi_version: u32 = 1;
 pub const adapter_format_unknown: u32 = 0;
 pub const adapter_format_clap: u32 = 1;
 pub const adapter_format_lv2: u32 = 2;
+pub const adapter_format_vst3: u32 = 3;
 const adapter_clap_token = "wayembed.experimental.clap.wayland";
 const adapter_lv2_token = "https://wayembed.org/ns/ext/wayland-ui";
+const adapter_vst3_token = "WaylandSurfaceID";
 pub const feature_compositor: u64 = 1 << 0;
 pub const feature_subcompositor: u64 = 1 << 1;
 pub const feature_surface: u64 = 1 << 2;
@@ -500,6 +502,7 @@ fn adapterToken(format: u32) ?[*:0]const u8 {
     return switch (format) {
         adapter_format_clap => adapter_clap_token,
         adapter_format_lv2 => adapter_lv2_token,
+        adapter_format_vst3 => adapter_vst3_token,
         else => null,
     };
 }
@@ -578,6 +581,13 @@ test "adapter handoff initialization validates inputs" {
     try std.testing.expect(wayembed_adapter_handoff_init(&handoff, adapter_format_lv2, server, display));
     try std.testing.expect(wayembed_adapter_handoff_validate(&handoff));
     try std.testing.expectEqual(adapter_format_lv2, handoff.format);
+
+    handoff.format_token = adapter_clap_token;
+    try std.testing.expect(!wayembed_adapter_handoff_validate(&handoff));
+
+    try std.testing.expect(wayembed_adapter_handoff_init(&handoff, adapter_format_vst3, server, display));
+    try std.testing.expect(wayembed_adapter_handoff_validate(&handoff));
+    try std.testing.expectEqual(adapter_format_vst3, handoff.format);
 
     handoff.version = adapter_abi_version + 1;
     try std.testing.expect(!wayembed_adapter_handoff_validate(&handoff));

@@ -4,7 +4,7 @@ Phase 3 keeps the core delegated Wayland server format-neutral. Plugin
 format glue lives in the experimental adapter surface declared by
 `include/wayembed_adapters.h`.
 
-The adapter header intentionally has no CLAP or LV2 dependency. Hosts that
+The adapter header intentionally has no CLAP, LV2, or VST3 dependency. Hosts that
 already speak those formats translate between format-native objects and the
 small wayembed handoff structs.
 
@@ -39,7 +39,7 @@ The Phase 3 proof lives in
 [wayembed-sandbox](https://github.com/greenm01/wayembed-sandbox). It is a
 Nim host on purpose: it proves the C ABI from outside C and Zig.
 
-The sandbox covers seven paths:
+The sandbox covers nine paths:
 
 - `abi-smoke` checks adapter handoff and resize validation from Nim.
 - `embed-smoke` opens a live host surface, creates one plugin surface, and
@@ -52,6 +52,10 @@ The sandbox covers seven paths:
 - `lv2-order-smoke` checks the LV2-shaped feature handoff order.
 - `lv2-c-plugin-smoke` passes the LV2 display handoff into the C Wayland
   plugin fixture and embeds the fixture-created surface.
+- `vst3-order-smoke` checks the VST3-shaped Wayland host connection and
+  `WaylandSurfaceID` handoff order.
+- `vst3-c-plugin-smoke` passes the VST3 display handoff into the C Wayland
+  plugin fixture and embeds the fixture-created surface.
 
 Element carries the first opt-in real-host CLAP proof. Its wayembed spike is
 off by default, leaves the XEmbed path intact, and checks that the experimental
@@ -62,14 +66,14 @@ instead of pretending an X11 window can be used. Element can also be built
 against the `greenm01/JUCE` `wayland-juce8` fork, which exposes the Wayland
 peer state needed for the visible path.
 
-These are proof paths, not plugin loaders. Real CLAP and LV2 hosts still own
+These are proof paths, not plugin loaders. Real CLAP, LV2, and VST3 hosts still own
 bundle loading, plugin instantiation, GUI callbacks, and process management.
 
 ## Host Responsibilities
 
 wayembed does not load plugins, scan bundles, negotiate CLAP extensions, build
-LV2 feature arrays, or call plugin UI entry points. The host already owns those
-jobs.
+LV2 feature arrays, instantiate VST3 components, or call plugin UI entry points.
+The host already owns those jobs.
 
 The adapter contract gives that host a small Wayland payload: a display, a
 format token or URI, and resize validation. The host decides when a plugin UI
@@ -118,11 +122,29 @@ An LV2-shaped host should:
   host;
 - keep the actual wayembed calls in host code, not in the core library.
 
+## VST3 Mapping
+
+Use `WAYEMBED_ADAPTER_VST3_PLATFORM_TYPE_WAYLAND_SURFACE_ID` as the VST3
+platform type. It maps to the VST3 3.8 Wayland `WaylandSurfaceID` path.
+
+A VST3-shaped host should:
+
+- expose its wayembed display through a host-side Wayland connection object;
+- pass the host parent `wl_surface` through `IPlugView::attached()` with
+  `WaylandSurfaceID`;
+- map VST3 resize requests to `wayembed_adapter_resize` plus
+  `wayembed_embed_resize()` on the active embed handle.
+
+The wayembed adapter proof does not link the VST3 SDK. Real VST3 hosts still
+own component creation, `IPlugView`, `IPlugFrame`, `IWaylandHost`, and
+`IWaylandFrame` integration.
+
 ## Carla Notes
 
 For a Carla-style host, the adapter layer is thin:
 
-- the Carla plugin-format layer chooses the CLAP token or LV2 URI;
+- the Carla plugin-format layer chooses the CLAP token, LV2 URI, or VST3
+  platform type;
 - the existing host integration path creates the server and opens the
   client display;
 - `on_surface_created` still calls `wayembed_embed_attach()` with Carla's
@@ -131,5 +153,5 @@ For a Carla-style host, the adapter layer is thin:
   `wayembed_embed_resize()` on that handle.
 
 No adapter API in this first slice creates plugin instances, loads bundles,
-or dispatches CLAP/LV2 callbacks. Those responsibilities remain in the host
-or in a future format-specific helper.
+or dispatches CLAP/LV2/VST3 callbacks. Those responsibilities remain in the
+host or in a future format-specific helper.

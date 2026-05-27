@@ -39,11 +39,11 @@ current Phase 2 embedded UI path are complete:
   embedded-surface coordinate translation.
 - the embedded editor session lifecycle is formalized around explicit
   `wayembed_embed *` handles, with attach allowed from `on_surface_created`.
-- Phase 3 has a dependency-free experimental adapter contract for CLAP/LV2
+- Phase 3 has a dependency-free experimental adapter contract for CLAP/LV2/VST3
   handoff tokens and validated display/resize structs.
-- `wayembed-sandbox` proves the Phase 3 C ABI from Nim with CLAP-shaped and
-  LV2-shaped handoff order smokes, C fixture handoff smokes, and a live embed
-  smoke for both in-process display and raw-fd client handoff.
+- `wayembed-sandbox` proves the Phase 3 C ABI from Nim with CLAP-shaped,
+  LV2-shaped, and VST3-shaped handoff order smokes, C fixture handoff smokes,
+  and a live embed smoke for both in-process display and raw-fd client handoff.
 - Element has an opt-in CLAP spike that keeps XEmbed as the default and proves
   the adapter token/display handoff path without mapping pixels.
 - Element now has a second opt-in visible-embed gate
@@ -85,20 +85,20 @@ Per [roadmap.md](roadmap.md) Phase 4. Defer until lifecycle is stable.
 
 ## Later phases
 
-### CLAP and LV2 adapters
+### CLAP, LV2, and VST3 adapters
 
 Per [roadmap.md](roadmap.md) Phase 3. The core stays format-neutral; the
 first experimental handoff contract lives in `include/wayembed_adapters.h`
 and [adapter-contract.md](adapter-contract.md). `wayembed-sandbox` is the
-current proof harness. It now checks CLAP and LV2 handoffs against a tiny C
-Wayland plugin fixture, so the display handoff is proven outside Nim too.
+current proof harness. It now checks CLAP, LV2, and VST3 handoffs against a
+tiny C Wayland plugin fixture, so the display handoff is proven outside Nim too.
 Host-facing notes describe the Carla/Element-shaped glue path. Element now
 carries the first opt-in real-host CLAP spike: it accepts the wayembed token,
 passes the display handoff through `clap_plugin_gui.set_parent()`, and leaves
 XEmbed as the default. The visible-embed path is now gated separately and can
 consume the Wayland peer handles exposed by the `wayland-juce8` JUCE fork.
-Full CLAP/LV2 runtime helpers, stock-JUCE support, and wider host-toolkit APIs
-remain future work.
+Full CLAP/LV2/VST3 runtime helpers, stock-JUCE support, and wider host-toolkit
+APIs remain future work.
 
 ### Linux dmabuf
 

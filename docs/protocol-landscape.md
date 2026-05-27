@@ -52,8 +52,8 @@ meaning of the Wayland window pointer or a complete embedding contract.
 LV2 has `LV2_UI__parent` and UI classes such as `ui:X11UI`, but no widely
 adopted `WaylandUI` standard.
 
-VST3 has preliminary Wayland support through `IWaylandFrame`, reportedly using
-a proxy/nested-compositor style approach.
+VST3 3.8 defines a Wayland path through `IWaylandHost`, `IWaylandFrame`, and
+the `WaylandSurfaceID` platform type.
 
-`wayembed` should be format-neutral at the core and provide CLAP/LV2 adapters as
-separate layers.
+`wayembed` should be format-neutral at the core and provide CLAP, LV2, and VST3
+adapters as separate layers.

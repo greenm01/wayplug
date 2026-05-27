@@ -258,17 +258,39 @@ int main(void)
         wayembed_server_destroy(server);
         return 23;
     }
-    handoff.version = WAYEMBED_ADAPTER_ABI_VERSION + 1u;
+    handoff.format_token = WAYEMBED_ADAPTER_CLAP_EXPERIMENTAL_API;
     if (wayembed_adapter_handoff_validate(&handoff)) {
         wayembed_server_destroy(server);
         return 24;
+    }
+    if (!wayembed_adapter_handoff_init(&handoff,
+        WAYEMBED_ADAPTER_FORMAT_VST3,
+        server,
+        display)) {
+        wayembed_server_destroy(server);
+        return 25;
+    }
+    if (!wayembed_adapter_handoff_validate(&handoff) ||
+        handoff.version != WAYEMBED_ADAPTER_ABI_VERSION ||
+        handoff.format != WAYEMBED_ADAPTER_FORMAT_VST3 ||
+        handoff.display != display ||
+        handoff.format_token == NULL ||
+        strcmp(handoff.format_token,
+               WAYEMBED_ADAPTER_VST3_PLATFORM_TYPE_WAYLAND_SURFACE_ID) != 0) {
+        wayembed_server_destroy(server);
+        return 26;
+    }
+    handoff.version = WAYEMBED_ADAPTER_ABI_VERSION + 1u;
+    if (wayembed_adapter_handoff_validate(&handoff)) {
+        wayembed_server_destroy(server);
+        return 27;
     }
     if (wayembed_adapter_handoff_init(&handoff,
                                      WAYEMBED_ADAPTER_FORMAT_UNKNOWN,
                                      server,
                                      display)) {
         wayembed_server_destroy(server);
-        return 25;
+        return 28;
     }
 
     wayembed_adapter_resize resize;
@@ -279,56 +301,56 @@ int main(void)
     resize.scale = 1.0;
     if (!wayembed_adapter_resize_validate(&resize)) {
         wayembed_server_destroy(server);
-        return 26;
+        return 29;
     }
     resize.width = -1;
     if (wayembed_adapter_resize_validate(&resize)) {
         wayembed_server_destroy(server);
-        return 27;
+        return 30;
     }
     resize.width = 640;
     resize.scale = 0.0;
     if (wayembed_adapter_resize_validate(&resize)) {
         wayembed_server_destroy(server);
-        return 28;
+        return 31;
     }
     resize.scale = INFINITY;
     if (wayembed_adapter_resize_validate(&resize)) {
         wayembed_server_destroy(server);
-        return 29;
+        return 32;
     }
     resize.scale = NAN;
     if (wayembed_adapter_resize_validate(&resize)) {
         wayembed_server_destroy(server);
-        return 30;
+        return 33;
     }
 
     wayembed_snapshot *open_snapshot = wayembed_server_snapshot(server);
     if (open_snapshot == NULL) {
         wayembed_server_destroy(server);
-        return 31;
+        return 34;
     }
     size_t open_clients = 0;
     if (!snapshot_clients(open_snapshot, &open_clients) || open_clients != 1) {
         wayembed_snapshot_free(open_snapshot);
         wayembed_server_destroy(server);
-        return 32;
+        return 35;
     }
     if (!wayembed_server_close_client_display(server, display)) {
         wayembed_snapshot_free(open_snapshot);
         wayembed_server_destroy(server);
-        return 33;
+        return 36;
     }
     wayembed_server_dispatch(server);
     if (closed_count != 1) {
         wayembed_snapshot_free(open_snapshot);
         wayembed_server_destroy(server);
-        return 34;
+        return 37;
     }
     if (mapped_count != 0 || resized_count != 0 || destroyed_count != 0) {
         wayembed_snapshot_free(open_snapshot);
         wayembed_server_destroy(server);
-        return 35;
+        return 38;
     }
 
     size_t still_open_clients = 0;
@@ -336,21 +358,21 @@ int main(void)
         still_open_clients != 1) {
         wayembed_snapshot_free(open_snapshot);
         wayembed_server_destroy(server);
-        return 36;
+        return 39;
     }
     wayembed_snapshot_free(open_snapshot);
 
     wayembed_snapshot *closed_snapshot = wayembed_server_snapshot(server);
     if (closed_snapshot == NULL) {
         wayembed_server_destroy(server);
-        return 37;
+        return 40;
     }
     size_t closed_clients = 99;
     if (!snapshot_clients(closed_snapshot, &closed_clients) ||
         closed_clients != 0) {
         wayembed_snapshot_free(closed_snapshot);
         wayembed_server_destroy(server);
-        return 38;
+        return 41;
     }
     wayembed_snapshot_free(closed_snapshot);
 

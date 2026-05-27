@@ -14,11 +14,13 @@ extern "C" {
 
 #define WAYEMBED_ADAPTER_CLAP_EXPERIMENTAL_API "wayembed.experimental.clap.wayland"
 #define WAYEMBED_ADAPTER_LV2_EXPERIMENTAL_URI "https://wayembed.org/ns/ext/wayland-ui"
+#define WAYEMBED_ADAPTER_VST3_PLATFORM_TYPE_WAYLAND_SURFACE_ID "WaylandSurfaceID"
 
 typedef enum wayembed_adapter_format {
     WAYEMBED_ADAPTER_FORMAT_UNKNOWN = 0,
     WAYEMBED_ADAPTER_FORMAT_CLAP = 1,
     WAYEMBED_ADAPTER_FORMAT_LV2 = 2,
+    WAYEMBED_ADAPTER_FORMAT_VST3 = 3,
 } wayembed_adapter_format;
 
 typedef struct wayembed_adapter_handoff {

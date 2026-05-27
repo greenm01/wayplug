@@ -58,12 +58,15 @@ Initial smoke coverage:
 - Experimental LV2 extension mapping: starter contract exists in
   `include/wayembed_adapters.h`; `wayembed-sandbox` covers the feature handoff
   order.
+- Experimental VST3 Wayland mapping: starter contract exists in
+  `include/wayembed_adapters.h`; `wayembed-sandbox` covers the host connection
+  and `WaylandSurfaceID` handoff order.
 - Tiny host/plugin examples: `wayembed-sandbox` opens a live host surface and
   embeds one plugin-created surface through the C ABI.
 - Raw fd handoff proof: `wayembed-sandbox` connects a plugin-side Wayland
   display to `wayembed_server_open_client_fd()` and embeds the plugin-created
   surface.
-- C plugin fixture proofs: `wayembed-sandbox` passes CLAP and LV2 handoff
+- C plugin fixture proofs: `wayembed-sandbox` passes CLAP, LV2, and VST3 handoff
   displays into C code, then embeds the C-created surfaces.
 - Carla- and Element-oriented integration notes for host-owned plugin glue.
 - Element CLAP proof: opt-in host spike proves the adapter token and display
@@ -83,5 +86,5 @@ Initial smoke coverage:
 
 - Full compositor implementation.
 - X11/XWayland compatibility.
-- Stable public CLAP/LV2 extension before proof of concept.
+- Stable public CLAP/LV2/VST3 extension before proof of concept.
 - Floating-window transient support via `xdg_foreign_unstable_v2`.
