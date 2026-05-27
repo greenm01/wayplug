@@ -46,37 +46,16 @@ The Phase 3 proof lives in
 [wayembed-sandbox](https://github.com/greenm01/wayembed-sandbox). It is a
 Nim host on purpose: it proves the C ABI from outside C and Zig.
 
-The sandbox covers ten paths:
+The sandbox also checks CLAP/LV2/VST3 handoff order and embeds C-created plugin
+surfaces through both display and fd handoffs.
 
-- `abi-smoke` checks adapter handoff and resize validation from Nim.
-- `embed-smoke` opens a live host surface, creates one plugin surface, and
-  embeds it through `on_surface_created`.
-- `fd-embed-smoke` opens a raw client fd, connects a plugin-side display to
-  that fd, and embeds the plugin-created surface.
-- `clap-order-smoke` checks the CLAP-shaped display handoff order.
-- `clap-c-plugin-smoke` passes the CLAP display handoff into a tiny C Wayland
-  plugin fixture and embeds the fixture-created surface.
-- `lv2-order-smoke` checks the LV2-shaped feature handoff order.
-- `lv2-c-plugin-smoke` passes the LV2 display handoff into the C Wayland
-  plugin fixture and embeds the fixture-created surface.
-- `vst3-order-smoke` checks the VST3-shaped Wayland host connection and
-  `WaylandSurfaceID` handoff order.
-- `vst3-c-plugin-smoke` passes the VST3 display handoff into the C Wayland
-  plugin fixture and embeds the fixture-created surface.
-- `adapter-fd-c-plugin-smoke` repeats the C fixture path through fd-backed
-  CLAP, LV2, and VST3 handoffs.
+Element carries an opt-in real-host CLAP proof while XEmbed remains the default.
+That proof belongs above the core adapter layer: Element owns CLAP callbacks,
+toolkit state, and fallback policy.
 
-Element carries the first opt-in real-host CLAP proof. Its wayembed spike is
-off by default, leaves the XEmbed path intact, and checks that the experimental
-CLAP token can carry a live wayembed display through the host GUI path. The
-visible embedding path is gated separately with `ELEMENT_WAYEMBED_CLAP_EMBED=1`;
-stock JUCE 8.0.12 on Linux still reports the missing host parent `wl_surface`
-instead of pretending an X11 window can be used. Element can also be built
-against the `greenm01/JUCE` `wayland-juce8` fork, which exposes the Wayland
-peer state needed for the visible path.
-
-These are proof paths, not plugin loaders. Real CLAP, LV2, and VST3 hosts still own
-bundle loading, plugin instantiation, GUI callbacks, and process management.
+These are proof paths, not plugin loaders. Real CLAP, LV2, and VST3 hosts still
+own bundle loading, plugin instantiation, GUI callbacks, and process
+management.
 
 ## Host Responsibilities
 

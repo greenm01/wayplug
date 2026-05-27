@@ -53,27 +53,13 @@ Initial smoke coverage:
 
 ## Phase 3: Plugin Format Adapters
 
-- Experimental CLAP extension mapping: starter contract exists in
-  `include/wayembed_adapters.h`; `wayembed-sandbox` covers the handoff order.
-- Experimental LV2 extension mapping: starter contract exists in
-  `include/wayembed_adapters.h`; `wayembed-sandbox` covers the feature handoff
-  order.
-- Experimental VST3 Wayland mapping: starter contract exists in
-  `include/wayembed_adapters.h`; `wayembed-sandbox` covers the host connection
-  and `WaylandSurfaceID` handoff order.
-- Tiny host/plugin examples: `wayembed-sandbox` opens a live host surface and
-  embeds one plugin-created surface through the C ABI.
-- Raw fd handoff proof: `wayembed-sandbox` connects a plugin-side Wayland
-  display to `wayembed_server_open_client_fd()` and embeds the plugin-created
-  surface.
-- C plugin fixture proofs: `wayembed-sandbox` passes CLAP, LV2, and VST3 handoff
-  displays into C code, then embeds the C-created surfaces.
-- Carla- and Element-oriented integration notes for host-owned plugin glue.
-- Element CLAP proof: opt-in host spike proves the adapter token and display
-  handoff while XEmbed remains the default. Visible embedding has its own
-  runtime gate. Stock JUCE 8.0.12 still lacks parent `wl_surface` access, but
-  the `greenm01/JUCE` `wayland-juce8` fork exposes the Wayland peer state that
-  Element needs for `wayembed_embed_attach()`.
+- Keep the core format-neutral.
+- Provide experimental CLAP, LV2, and VST3 handoff mappings in
+  `include/wayembed_adapters.h`.
+- Prove display and fd handoff paths through `wayembed-sandbox`.
+- Document Carla- and Element-shaped host integration.
+- Use real-host spikes to decide whether adapter helper APIs belong in
+  wayembed or in host glue.
 
 ## Phase 4: Performance and Completeness
 
