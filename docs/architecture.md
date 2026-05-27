@@ -119,7 +119,7 @@ wayplug/
     protocol_smoke_tests.zig
 
   docs/
-    archtecture.md
+    architecture.md
     dod.md
     protocol-landscape.md
     wsd-architecture.md
@@ -264,6 +264,21 @@ onEmbedResized(embed, width, height)
 onProtocolError(client, error)
 ```
 
+## Host Notifications
+
+The host receives lifecycle events through the `wayplug_host_interface`
+callback struct defined in [C ABI Sketch](c-abi-sketch.md). The engine calls
+these callbacks synchronously from inside `wayplug_server_dispatch()`.
+
+Rules:
+
+- Callbacks return `void`. They report; they do not gate. Policy decisions
+  belong in `src/systems/` and run before the notification fires.
+- Callbacks must not call back into `wayplug`. Re-entrancy is undefined.
+- A null function pointer in the host interface is a no-op.
+- The engine drains its effect queue at the end of each dispatch tick, after
+  every protocol callback for that tick has run.
+
 ## Event Flow
 
 ```text
@@ -280,9 +295,11 @@ protocol delegate callback
         +-- central state notification when lifecycle changes
 ```
 
-The event loop should stay Wayland-native. `wayplug` does not need to invent a
-separate application runtime. It needs clear ownership around the Wayland event
-loop it integrates with.
+`wayplug` does not own a dispatch loop. The server exposes its fd through
+`wayplug_server_get_fd()`. The host adds that fd to its event loop and calls
+`wayplug_server_dispatch()` when the fd becomes readable. The host calls
+`wayplug_server_flush()` before blocking. `wayplug` never spawns threads or
+polls on its own.
 
 ## Ownership Model
 
@@ -321,6 +338,24 @@ Embed
 
 This keeps teardown deterministic. When a client closes, the server can walk
 the owned tables and destroy resources in the correct order.
+
+## Teardown Order
+
+When a client disconnects, the engine walks owned objects in a fixed order:
+
+1. embeds owned by the client (unmap subsurfaces first)
+2. plugin-created child surfaces
+3. buffers and pending frame callbacks
+4. remaining resources
+5. resource-by-\* indexes for this client
+6. `wl_client` and `wl_display` handles
+7. socket fds, server side first, then client side
+8. the client row in the clients table
+
+The client enters `ClientState.closing` at step 1 and reaches
+`ClientState.dead` after step 8. This order matches
+`waylandserver.cpp::closeClientConnection` in the C++ reference and keeps
+Wayland's "destroy children before parent" rule intact.
 
 ## Policy Belongs Above Protocol
 

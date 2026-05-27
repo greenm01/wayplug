@@ -23,12 +23,12 @@ this file adds the operational details an agent needs to act safely.
 8. Keep the public ABI stable. Changes to `include/wayplug.h` must preserve C
    ABI compatibility unless the ABI version is intentionally changed.
 9. Keep source files small and focused. If a file grows too broad, split it by
-   domain according to `docs/archtecture.md`.
+   domain according to `docs/architecture.md`.
 10. Keep data separate from logic. Follow `docs/dod.md` when touching runtime
     state, resource ownership, operations, queries, or systems.
 11. Follow `docs/style-guide.md` for Zig style, C ABI rules, naming, ownership,
     error handling, and module boundaries.
-12. Re-read `docs/archtecture.md`, `docs/dod.md`, and
+12. Re-read `docs/architecture.md`, `docs/dod.md`, and
     `docs/style-guide.md` after context compaction or when resuming a long
     task that touches architecture-sensitive code.
 

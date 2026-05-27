@@ -151,6 +151,11 @@ pub fn deinit(model: *Model) void {
 }
 ```
 
+The server allocator is chosen at server creation. For MVP,
+`wayplug_server_create()` uses `std.heap.c_allocator`. A future ABI version
+may accept a host-supplied allocator interface (`wayplug_allocator_v1`) for
+hosts that need to track wayplug allocations.
+
 ## Error Handling
 
 Use Zig errors internally where they improve clarity.
@@ -184,6 +189,12 @@ Rules:
 
 `src/c_api.zig` should be the only module that exports public C symbols.
 Internal modules should not know about public ABI validation details.
+
+`wayplug_server_destroy(srv)` invalidates every handle the server has
+issued, including client displays and resources. The host must stop using
+those handles before calling destroy. Destroy is the only guaranteed path
+to release server-owned memory; `wayplug_server_close_client_display()`
+only tears down a single client.
 
 ## Wayland Handles
 

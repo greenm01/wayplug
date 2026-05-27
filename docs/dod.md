@@ -142,7 +142,9 @@ The records should not grow methods like `surface.attach()` or
 
 ## Model
 
-The model should be table-oriented.
+The model should be table-oriented. It holds the server allocator. Every
+long-lived table and index uses that allocator. Ops and queries read the
+allocator from the model rather than taking it as a parameter.
 
 ```zig
 pub const WayplugModel = struct {
@@ -251,6 +253,11 @@ allocation-returning helpers.
 
 Allocation-returning helpers are acceptable for snapshots, diagnostics, and
 tests.
+
+Iterators yield borrowed views. They do not allocate. Any operation that
+mutates the underlying table invalidates outstanding iterators on that
+table. Callers must not hold an iterator across an ops call. Iteration order
+is ascending logical id.
 
 ## Queries
 
@@ -445,6 +452,12 @@ EffectDiagnosticsDirty
 Do not overuse effects for ordinary forwarding. They are useful when an
 operation should notify the host, update diagnostics, or schedule cleanup.
 
+Ops append effects to a per-dispatch queue. The engine drains the queue at
+the end of `dispatch()`, after every protocol callback for that tick has
+run. Host-visible effects fire as `wayplug_host_interface` callbacks.
+Diagnostic effects set snapshot dirty bits. Effects fire in append order
+and must not call back into ops.
+
 ## Invariants
 
 Add invariant checks early. They will catch the most expensive bugs.
@@ -485,6 +498,11 @@ Snapshots are useful for:
 - reproducing compositor-specific behavior
 
 Snapshots may allocate. Hot protocol paths should not.
+
+A snapshot is caller-owned. The snapshot function allocates with the server
+allocator and returns a value the caller releases with `snapshotFree()`. The
+C ABI exposes a matching `wayplug_snapshot_free()`. A snapshot is a copy;
+subsequent ops do not invalidate it.
 
 ## Good Split
 
