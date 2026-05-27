@@ -50,6 +50,13 @@ Weston, River, and Mutter headless coverage exists in
 display is available. Add KWin and Hyprland coverage once reliable headless
 or nested test invocations are available.
 
+Hyprland 0.55.2 is installed on the CachyOS dev machine, but is not yet
+usable as a smoke target: isolated headless startup fails before creating a
+Wayland socket because Aquamarine cannot open a backend/allocator, and nested
+startup currently fails against tested parent compositors due to missing or
+incompatible parent protocols. Keep the crash reports and compositor logs as
+diagnostics for the next investigation pass.
+
 ### CI
 
 Baseline GitHub Actions coverage exists with a pinned Zig version,
