@@ -94,6 +94,15 @@ into the matching `wayplug_host_interface` callback. Confirm the
 ordering matches [architecture.md](architecture.md) § Host
 Notifications.
 
+### `on_protocol_error` host callback
+
+The `protocol_error` effect exists in `engine/effects.zig` but has no
+matching callback in `wayplug_host_interface`. Add the field to
+`include/wayplug.h` and wire it through the effect drain. The callback
+receives the `wayplug_client *` handle and the Wayland error code. Update
+`tests/c_abi_smoke.c` to cover the new field. See
+[logging.md](logging.md) § Planned Diagnostics Expansion.
+
 ### Real snapshot copy and relationship invariants
 
 `data/snapshot.zig` counts records today; should copy them. The
@@ -103,7 +112,28 @@ checks called out in [dod.md](dod.md) § Invariants (every
 `Resource.client_id` exists, every embed's surface ids exist, no
 destroyed records in indexes).
 
+### Snapshot C ABI
+
+Once the snapshot copy is real, expose it through the public header:
+`wayplug_server_snapshot(server)` returns a caller-owned
+`wayplug_snapshot *`; `wayplug_snapshot_free(snapshot)` releases it.
+The snapshot is a point-in-time copy; subsequent ops do not invalidate
+it. Add to `include/wayplug.h` and cover the round-trip in
+`tests/c_abi_smoke.c`. See [logging.md](logging.md) § Planned
+Diagnostics Expansion.
+
 ## Phase 2: Embedded UI working
+
+### Embed lifecycle callbacks
+
+The `embed_mapped`, `embed_resized`, and `embed_destroyed` effects exist
+in `engine/effects.zig` but have no matching callbacks in
+`wayplug_host_interface`. Add `on_embed_mapped`, `on_embed_resized`, and
+`on_embed_destroyed` to `include/wayplug.h`. Each receives a stable embed
+id (`uint32_t`, not reused within a server's lifetime) so the host can
+correlate events across the embed's lifecycle. Wire through the effect
+drain. Update `tests/c_abi_smoke.c`. See [logging.md](logging.md) §
+Planned Diagnostics Expansion.
 
 ### Embed input coordinate translation
 
