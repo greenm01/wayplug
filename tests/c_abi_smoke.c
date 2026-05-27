@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <wayland-client.h>
 
 static int connected_count = 0;
@@ -43,7 +44,8 @@ static int check_feature_flags(uint64_t flags)
         WAYEMBED_FEATURE_KEYBOARD |
         WAYEMBED_FEATURE_TOUCH |
         WAYEMBED_FEATURE_OUTPUT |
-        WAYEMBED_FEATURE_XDG_SHELL;
+        WAYEMBED_FEATURE_XDG_SHELL |
+        WAYEMBED_FEATURE_CLIENT_FD;
     return (flags & expected) == expected;
 }
 
@@ -312,12 +314,75 @@ int main(void)
     }
     wayembed_snapshot_free(closed_snapshot);
 
+    /* fd handoff cycle, explicit close. */
+    wayembed_client *fd_client = NULL;
+    if (wayembed_server_open_client_fd(NULL, &fd_client) != -1) {
+        wayembed_server_destroy(server);
+        return 33;
+    }
+    if (wayembed_server_open_client_fd(server, NULL) != -1) {
+        wayembed_server_destroy(server);
+        return 34;
+    }
+    if (wayembed_server_close_client(NULL, NULL)) {
+        wayembed_server_destroy(server);
+        return 35;
+    }
+
+    int client_fd = wayembed_server_open_client_fd(server, &fd_client);
+    if (client_fd < 0 || fd_client == NULL) {
+        wayembed_server_destroy(server);
+        return 36;
+    }
+    wayembed_server_dispatch(server);
+    if (connected_count != 2 || last_client != fd_client) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 37;
+    }
+    if (!wayembed_server_close_client(server, fd_client)) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 38;
+    }
+    if (wayembed_server_close_client(server, fd_client)) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 39;
+    }
+    close(client_fd);
+    wayembed_server_dispatch(server);
+    if (closed_count != 2) {
+        wayembed_server_destroy(server);
+        return 40;
+    }
+
+    /* fd handoff cycle, remote fd close. */
+    fd_client = NULL;
+    client_fd = wayembed_server_open_client_fd(server, &fd_client);
+    if (client_fd < 0 || fd_client == NULL) {
+        wayembed_server_destroy(server);
+        return 41;
+    }
+    wayembed_server_dispatch(server);
+    if (connected_count != 3 || last_client != fd_client) {
+        close(client_fd);
+        wayembed_server_destroy(server);
+        return 42;
+    }
+    close(client_fd);
+    wayembed_server_dispatch(server);
+    if (closed_count != 3) {
+        wayembed_server_destroy(server);
+        return 43;
+    }
+
     /* Embed operations reject invalid handles and structs with status codes. */
     wayembed_embed *embed = NULL;
     if (wayembed_embed_attach(NULL, &embed) !=
         WAYEMBED_EMBED_STATUS_INVALID_ARGUMENT) {
         wayembed_server_destroy(server);
-        return 33;
+        return 44;
     }
     wayembed_embed_attach_info attach_info;
     attach_info.size = offsetof(wayembed_embed_attach_info, child_surface);
@@ -328,24 +393,24 @@ int main(void)
     if (wayembed_embed_attach(&attach_info, &embed) !=
         WAYEMBED_EMBED_STATUS_INVALID_ARGUMENT) {
         wayembed_server_destroy(server);
-        return 34;
+        return 45;
     }
     attach_info.size = sizeof(attach_info);
     attach_info.version = WAYEMBED_ABI_VERSION + 1u;
     if (wayembed_embed_attach(&attach_info, &embed) !=
         WAYEMBED_EMBED_STATUS_INVALID_ARGUMENT) {
         wayembed_server_destroy(server);
-        return 35;
+        return 46;
     }
     if (wayembed_embed_resize(NULL, 0, 0) !=
         WAYEMBED_EMBED_STATUS_INVALID_ARGUMENT) {
         wayembed_server_destroy(server);
-        return 36;
+        return 47;
     }
     if (wayembed_embed_id(NULL) != 0 ||
         wayembed_embed_client(NULL) != NULL) {
         wayembed_server_destroy(server);
-        return 37;
+        return 48;
     }
 
     wayembed_server_destroy(server);

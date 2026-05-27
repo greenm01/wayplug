@@ -12,6 +12,7 @@ pub const wl_event_loop = c.struct_wl_event_loop;
 pub const wl_resource = c.struct_wl_resource;
 pub const wl_global = c.struct_wl_global;
 pub const wl_interface = c.struct_wl_interface;
+pub const wl_listener = c.struct_wl_listener;
 
 test "opaque types are declared" {
     const std = @import("std");

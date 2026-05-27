@@ -22,6 +22,7 @@ extern "C" {
 #define WAYEMBED_FEATURE_TOUCH (1ull << 8)
 #define WAYEMBED_FEATURE_OUTPUT (1ull << 9)
 #define WAYEMBED_FEATURE_XDG_SHELL (1ull << 10)
+#define WAYEMBED_FEATURE_CLIENT_FD (1ull << 11)
 
 #define WAYEMBED_EMBED_STATUS_OK 0u
 #define WAYEMBED_EMBED_STATUS_INVALID_ARGUMENT 1u
@@ -161,6 +162,14 @@ void wayembed_snapshot_free(wayembed_snapshot *snapshot);
 struct wl_display *wayembed_server_open_client_display(wayembed_server *server);
 bool wayembed_server_close_client_display(wayembed_server *server,
                                           struct wl_display *display);
+
+/* Opens a plugin-side connection fd for out-of-process handoff.
+ * The caller owns the returned fd. Close the client with
+ * wayembed_server_close_client(), or close the fd and dispatch the server. */
+int wayembed_server_open_client_fd(wayembed_server *server,
+                                   wayembed_client **out_client);
+bool wayembed_server_close_client(wayembed_server *server,
+                                  wayembed_client *client);
 
 struct wl_proxy *wayembed_server_create_proxy(wayembed_server *server,
                                               struct wl_display *client_display,

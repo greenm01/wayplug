@@ -206,7 +206,7 @@ Internal modules should not know about public ABI validation details.
 issued, including client displays and resources. The host must stop using
 those handles before calling destroy. Destroy is the only guaranteed path
 to release server-owned memory; `wayembed_server_close_client_display()`
-only tears down a single client.
+and `wayembed_server_close_client()` only tear down a single client.
 
 ## Wayland Handles
 

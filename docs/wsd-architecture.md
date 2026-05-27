@@ -101,8 +101,9 @@ socketpair(AF_UNIX, SOCK_STREAM)
                     returned to plugin as wl_display *
 ```
 
-The current C++ API returns `wl_display *` directly. For an out-of-process ABI,
-a future design would likely expose a connection fd instead.
+The C++ API returns `wl_display *` directly. Wayembed keeps that convenience
+path for in-process plugin glue and also exposes a raw client fd for
+out-of-process hosts.
 
 ## Registry Delegation
 
@@ -354,18 +355,18 @@ XdgWindowManagerDelegate creates real xdg_surface
 For plugin hosting, XDG shell is useful for menus, popups, dialogs, or floating
 editors. It is not the primitive that embeds a plugin editor into a host panel.
 
-## Important Limitations
+## Prior-Art Limits And Wayembed Response
 
-- The public API is C++, not a stable C ABI.
-- It exposes abstract classes, virtual methods, inheritance, and singleton
-  access.
-- It does not provide a complete fd-oriented out-of-process API.
-- It implements a selected subset of protocols, not arbitrary Wayland protocol
-  forwarding.
-- `xdg_foreign` is not implemented.
-- Several useful desktop protocols are only mentioned as future candidates:
-  data device, decorations, activation, viewporter, keyboard shortcuts inhibit,
-  tablet, and text input.
+WSD is useful prior art, but Wayembed should not inherit its public boundary.
+
+| WSD limit | Wayembed response |
+| --- | --- |
+| Public API is C++. | Public API is a C ABI with opaque handles and versioned structs. |
+| API exposes abstract classes, virtual methods, inheritance, and singleton access. | Host integration uses callback tables. Internal Zig types stay private. |
+| No complete fd-oriented out-of-process API. | Core now has fd handoff through `wayembed_server_open_client_fd()`. Process launch stays host-owned. |
+| Selected protocol subset, not arbitrary forwarding. | This is intentional. Wayembed uses modular delegates and feature flags instead of promising transparent Wayland proxying. |
+| `xdg_foreign` is missing. | Embedded subsurface mode does not need it. Floating editors and transient dialogs do, so it belongs in the floating-window track. |
+| Desktop protocols sit in a loose future list. | Wayembed should group them by job: embedding quality, floating windows, app/plugin UX, and specialized input. |
 
 ## Lessons For Wayembed
 

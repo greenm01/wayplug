@@ -29,6 +29,10 @@ The adapter structs are descriptive. They do not own the display, server,
 client, or surfaces. Existing wayembed ownership rules stay in
 `wayembed.h`.
 
+The starter adapter handoff is display-oriented. Hosts that need a separate
+plugin process should use `wayembed_server_open_client_fd()` in their
+format-specific glue and pass the fd through that process contract.
+
 ## CLAP Mapping
 
 Use `WAYEMBED_ADAPTER_CLAP_EXPERIMENTAL_API` as the experimental API token.

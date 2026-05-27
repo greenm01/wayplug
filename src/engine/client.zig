@@ -35,17 +35,34 @@ pub fn clientCreate(
     return id;
 }
 
+pub fn clientSetWlClient(
+    m: *model_mod.Model,
+    id: types.ClientId,
+    wl_client: *wls.wl_client,
+) !void {
+    const c = m.clients.getMutable(id) orelse return error.UnknownClient;
+    c.wl_client = wl_client;
+    try m.client_by_wl_client.put(m.allocator, wl_client, id);
+}
+
+pub fn clientSetDisplay(
+    m: *model_mod.Model,
+    id: types.ClientId,
+    display: *wlc.wl_display,
+) !void {
+    const c = m.clients.getMutable(id) orelse return error.UnknownClient;
+    c.wl_display = display;
+    try m.client_by_display.put(m.allocator, display, id);
+}
+
 pub fn clientSetWaylandHandles(
     m: *model_mod.Model,
     id: types.ClientId,
     wl_client: *wls.wl_client,
     display: *wlc.wl_display,
 ) !void {
-    const c = m.clients.getMutable(id) orelse return error.UnknownClient;
-    c.wl_client = wl_client;
-    c.wl_display = display;
-    try m.client_by_wl_client.put(m.allocator, wl_client, id);
-    try m.client_by_display.put(m.allocator, display, id);
+    try clientSetWlClient(m, id, wl_client);
+    try clientSetDisplay(m, id, display);
 }
 
 pub fn clientDestroy(m: *model_mod.Model, id: types.ClientId) void {

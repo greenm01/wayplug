@@ -46,6 +46,7 @@ Wayland globals a server advertises to a plugin display.
 | `WAYEMBED_FEATURE_TOUCH` | touch forwarding with coordinate translation |
 | `WAYEMBED_FEATURE_OUTPUT` | initial `wl_output` metadata |
 | `WAYEMBED_FEATURE_XDG_SHELL` | delegated XDG shell objects |
+| `WAYEMBED_FEATURE_CLIENT_FD` | raw client fd handoff for out-of-process plugins |
 
 ## Shape of a Session
 
@@ -114,6 +115,10 @@ static bool get_subsurface_offset(void *u, int32_t *x, int32_t *y,
     return true;
 }
 ```
+
+`display` is the plugin-side `wl_display *` for in-process clients. It is null
+for clients opened with `wayembed_server_open_client_fd()`. Use
+`wayembed_client *` as the stable key for per-plugin state.
 
 The surface callback is where embedded mode starts:
 
@@ -208,6 +213,37 @@ plugin_gui->show(plugin);
 
 The plugin sees a normal `wl_display *`: bind globals, create a surface, attach
 buffers, and commit.
+
+## Opening A Plugin Fd
+
+For an out-of-process plugin, open a client fd instead of a client display.
+
+```c
+wayembed_client *plugin_client = NULL;
+int plugin_fd = wayembed_server_open_client_fd(server, &plugin_client);
+
+if (plugin_fd < 0 || !plugin_client) {
+    return CLAP_WINDOW_API_FAILED;
+}
+```
+
+The host owns `plugin_fd`. Pass it through the plugin format's process or IPC
+glue, then close the fd in the host when that handoff is done. If the plugin
+closes its end or exits, the host must dispatch the wayembed server so
+`on_client_closed` can fire.
+
+`plugin_client` is live as soon as the call succeeds. Use it to key host-side
+state for the process you launch. `on_client_connected` still fires from
+`wayembed_server_dispatch()`, which keeps callback timing the same as the
+display path.
+
+To stop a fd-opened client from the host side:
+
+```c
+wayembed_server_close_client(server, plugin_client);
+close(plugin_fd);
+wayembed_server_dispatch(server);
+```
 
 ## Embedded Surface Contract
 

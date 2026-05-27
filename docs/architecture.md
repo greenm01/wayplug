@@ -345,8 +345,8 @@ When a client disconnects, the engine walks owned objects in a fixed order:
 3. buffers and pending frame callbacks
 4. remaining resources
 5. resource-by-\* indexes for this client
-6. `wl_client` and `wl_display` handles
-7. socket fds, server side first, then client side
+6. `wl_client` and optional `wl_display` handles
+7. socket fds, except raw fds already handed to the host
 8. the client row in the clients table
 
 The client enters `ClientState.closing` at step 1 and reaches

@@ -209,7 +209,7 @@ Hot lookups should use indexes instead of scans.
 
 ```text
 wl_client *    -> ClientId
-wl_display *   -> ClientId
+wl_display *   -> ClientId, for in-process display handoff
 wl_resource *  -> ResourceId
 wl_proxy *     -> ResourceId
 ResourceId     -> SurfaceId

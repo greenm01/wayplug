@@ -47,6 +47,22 @@ pub const Engine = struct {
         try client.clientSetWaylandHandles(&self.model, id, wl_client, display);
     }
 
+    pub fn clientSetWlClient(
+        self: *Engine,
+        id: types.ClientId,
+        wl_client: *@import("../wayland/server.zig").wl_client,
+    ) !void {
+        try client.clientSetWlClient(&self.model, id, wl_client);
+    }
+
+    pub fn clientSetDisplay(
+        self: *Engine,
+        id: types.ClientId,
+        display: *@import("../wayland/client.zig").wl_display,
+    ) !void {
+        try client.clientSetDisplay(&self.model, id, display);
+    }
+
     pub fn clientDestroy(self: *Engine, id: types.ClientId) !void {
         if (!self.model.clients.contains(id)) return;
         for (self.model.embeds.items()) |record| {

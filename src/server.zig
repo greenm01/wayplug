@@ -28,6 +28,8 @@ pub const ClientHandle = struct {
     client_id: types.ClientId,
     wl_client: ?*wls.wl_client,
     display: ?*wlc.wl_display,
+    destroy_listener: wls.wl_listener,
+    destroy_listener_attached: bool = false,
     close_pending: bool = false,
 };
 
@@ -36,6 +38,12 @@ pub const EmbedHandle = struct {
     embed_id: types.EmbedId,
     client_id: types.ClientId,
     destroyed: bool = false,
+};
+
+const OpenedClient = struct {
+    handle: *ClientHandle,
+    client_fd: c_int,
+    display: ?*wlc.wl_display = null,
 };
 
 pub const ResourceData = struct {
@@ -134,6 +142,24 @@ pub const Server = struct {
     }
 
     pub fn openClientDisplay(self: *Server) ?*wlc.wl_display {
+        const opened = self.openClientHandle(.display) orelse return null;
+        self.flush();
+        return opened.display.?;
+    }
+
+    pub fn openClientFd(self: *Server, out_client: *?*c_api.wayembed_client) c_int {
+        const opened = self.openClientHandle(.fd) orelse return -1;
+        out_client.* = opaqueClient(opened.handle);
+        self.flush();
+        return opened.client_fd;
+    }
+
+    const ClientOpenMode = enum {
+        display,
+        fd,
+    };
+
+    fn openClientHandle(self: *Server, mode: ClientOpenMode) ?OpenedClient {
         var fds: [2]c_int = undefined;
         if (sys.socketpair(sys.AF_UNIX, sys.SOCK_STREAM, 0, &fds) != 0) return null;
         var server_fd_owned = true;
@@ -153,37 +179,65 @@ pub const Server = struct {
         var wl_client_cleanup: ?*wls.wl_client = wl_client;
         defer if (wl_client_cleanup) |client| wls.c.wl_client_destroy(client);
 
-        const client_display = wlc.c.wl_display_connect_to_fd(fds[1]) orelse return null;
-        client_fd_owned = false;
-        var client_display_cleanup: ?*wlc.wl_display = client_display;
+        var client_display_cleanup: ?*wlc.wl_display = null;
+        if (mode == .display) {
+            const client_display = wlc.c.wl_display_connect_to_fd(fds[1]) orelse return null;
+            client_fd_owned = false;
+            client_display_cleanup = client_display;
+        }
         defer if (client_display_cleanup) |display| wlc.c.wl_display_disconnect(display);
+
+        self.client_handles.ensureUnusedCapacity(self.allocator, 1) catch return null;
+        const handle = self.allocator.create(ClientHandle) catch return null;
+        var handle_cleanup: ?*ClientHandle = handle;
+        defer if (handle_cleanup) |h| {
+            self.detachClientDestroyListener(h);
+            self.allocator.destroy(h);
+        };
 
         const client_id = self.engine.clientCreate(fds[0], fds[1]) catch return null;
         var client_id_cleanup: ?types.ClientId = client_id;
-        defer if (client_id_cleanup) |id| self.engine.clientDestroy(id) catch {};
-        self.engine.clientSetWaylandHandles(client_id, wl_client, client_display) catch return null;
+        defer if (client_id_cleanup) |id| @import("engine/client.zig").clientDestroy(&self.engine.model, id);
+        self.engine.clientSetWlClient(client_id, wl_client) catch return null;
+        if (client_display_cleanup) |display| {
+            self.engine.clientSetDisplay(client_id, display) catch return null;
+        }
 
-        const handle = self.allocator.create(ClientHandle) catch return null;
-        var handle_cleanup: ?*ClientHandle = handle;
-        defer if (handle_cleanup) |h| self.allocator.destroy(h);
         handle.* = .{
             .server = self,
             .client_id = client_id,
             .wl_client = wl_client,
-            .display = client_display,
+            .display = client_display_cleanup,
+            .destroy_listener = std.mem.zeroes(wls.wl_listener),
         };
-        self.client_handles.append(self.allocator, handle) catch return null;
+        self.attachClientDestroyListener(handle);
+        self.client_handles.appendAssumeCapacity(handle);
         wl_client_cleanup = null;
-        client_display_cleanup = null;
         client_id_cleanup = null;
         handle_cleanup = null;
+        if (mode == .fd) {
+            client_fd_owned = false;
+        } else {
+            client_display_cleanup = null;
+        }
 
-        self.flush();
-        return client_display;
+        return .{
+            .handle = handle,
+            .client_fd = fds[1],
+            .display = handle.display,
+        };
     }
 
     pub fn closeClientDisplay(self: *Server, display: *wlc.wl_display) bool {
         const handle = self.findClientHandleByDisplay(display) orelse return false;
+        if (handle.close_pending) return false;
+        self.closeClientHandle(handle, true);
+        return true;
+    }
+
+    pub fn closeClient(self: *Server, client: *c_api.wayembed_client) bool {
+        const handle: *ClientHandle = @ptrCast(@alignCast(client));
+        if (handle.server != self or handle.close_pending) return false;
         self.closeClientHandle(handle, true);
         return true;
     }
@@ -207,11 +261,12 @@ pub const Server = struct {
     }
 
     fn closeClientHandle(self: *Server, handle: *ClientHandle, emit_effect: bool) void {
+        if (emit_effect and handle.close_pending) return;
         self.releaseClientOwnedUpstreams(handle.client_id);
         if (emit_effect) {
+            handle.close_pending = true;
             self.markClientEmbedsDestroyed(handle.client_id);
             self.engine.clientDestroy(handle.client_id) catch {};
-            handle.close_pending = true;
         } else {
             @import("engine/client.zig").clientDestroy(&self.engine.model, handle.client_id);
         }
@@ -220,9 +275,25 @@ pub const Server = struct {
             handle.display = null;
         }
         if (handle.wl_client) |wl_client| {
+            self.detachClientDestroyListener(handle);
             wls.c.wl_client_destroy(wl_client);
             handle.wl_client = null;
         }
+    }
+
+    fn attachClientDestroyListener(self: *Server, handle: *ClientHandle) void {
+        _ = self;
+        const wl_client = handle.wl_client orelse return;
+        handle.destroy_listener.notify = clientDestroyed;
+        wls.c.wl_client_add_destroy_listener(wl_client, &handle.destroy_listener);
+        handle.destroy_listener_attached = true;
+    }
+
+    fn detachClientDestroyListener(self: *Server, handle: *ClientHandle) void {
+        _ = self;
+        if (!handle.destroy_listener_attached) return;
+        wls.c.wl_list_remove(&handle.destroy_listener.link);
+        handle.destroy_listener_attached = false;
     }
 
     fn drainEffects(self: *Server) void {
@@ -662,6 +733,16 @@ fn opaqueEmbed(handle: ?*EmbedHandle) ?*c_api.wayembed_embed {
     return if (handle) |h| @ptrCast(h) else null;
 }
 
+fn clientDestroyed(listener: ?*wls.wl_listener, data: ?*anyopaque) callconv(.c) void {
+    _ = data;
+    const l = listener orelse return;
+    const handle: *ClientHandle = @fieldParentPtr("destroy_listener", l);
+    handle.server.detachClientDestroyListener(handle);
+    handle.wl_client = null;
+    if (handle.close_pending) return;
+    handle.server.closeClientHandle(handle, true);
+}
+
 const runtime_helpers = protocol_runtime.Helpers(Server, ResourceData);
 const registry_bindings = protocol_registry.Bindings(Server, ResourceData);
 
@@ -925,6 +1006,7 @@ test "embedded coordinate translation subtracts host subsurface offset" {
         .client_id = client_id,
         .wl_client = null,
         .display = fakeClientDisplay(0x1000),
+        .destroy_listener = std.mem.zeroes(wls.wl_listener),
     };
     try s.client_handles.append(s.allocator, handle);
     defer {
@@ -1026,6 +1108,7 @@ test "server embed resize rejects negative sizes and closed handles" {
         .client_id = client_id,
         .wl_client = null,
         .display = null,
+        .destroy_listener = std.mem.zeroes(wls.wl_listener),
     };
     try s.client_handles.append(s.allocator, client_handle);
     defer {
@@ -1073,6 +1156,7 @@ test "server embed attach reports early status failures" {
         .client_id = client_id,
         .wl_client = null,
         .display = null,
+        .destroy_listener = std.mem.zeroes(wls.wl_listener),
     };
     var out: ?*EmbedHandle = null;
     try std.testing.expectEqual(

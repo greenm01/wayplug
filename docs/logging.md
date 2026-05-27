@@ -22,8 +22,8 @@ unless noted. A null function pointer is a no-op.
 void (*on_client_connected)(void *userdata, wayembed_client *client);
 ```
 
-Fires when a plugin opens a display via `wayembed_server_open_client_display`.
-`client` is valid until `on_client_closed` fires for the same client.
+Fires when a plugin opens a display or fd-backed client connection. `client`
+is valid until `on_client_closed` fires for the same client.
 
 ```c
 void (*on_surface_created)(void *userdata,

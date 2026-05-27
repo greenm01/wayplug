@@ -100,6 +100,11 @@ struct wl_display *wayembed_server_open_client_display(wayembed_server *server);
 bool wayembed_server_close_client_display(wayembed_server *server,
                                          struct wl_display *display);
 
+int wayembed_server_open_client_fd(wayembed_server *server,
+                                  wayembed_client **out_client);
+bool wayembed_server_close_client(wayembed_server *server,
+                                 wayembed_client *client);
+
 struct wl_proxy *wayembed_server_create_proxy(wayembed_server *server,
                                              struct wl_display *client_display,
                                              struct wl_proxy *host_object,

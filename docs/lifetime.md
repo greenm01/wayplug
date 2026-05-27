@@ -33,6 +33,16 @@ The host passes that display to the plugin. The host closes it with
 `wayembed_server_close_client_display()`, or lets `wayembed_server_destroy()`
 tear it down.
 
+`wayembed_server_open_client_fd()` returns a plugin-side connection fd and
+stores the matching client handle in `out_client`. The caller owns the fd.
+Pass it to the plugin process, close any host-side duplicate when the handoff
+is done, and keep dispatching the wayembed server. A remote close turns into
+`on_client_closed` during dispatch.
+
+`wayembed_server_close_client()` closes a live client opened through either
+path. For fd-opened clients, it closes wayembed's server-side state. It does
+not close the raw fd returned to the host.
+
 `wayembed_client *` is an opaque handle. The host receives it in callbacks.
 It stays valid until `on_client_closed` fires. After that callback returns,
 the handle is dead.
@@ -109,8 +119,8 @@ When a client closes, wayembed destroys its state in this order:
 3. buffers and frame callbacks;
 4. remaining resources;
 5. resource indexes;
-6. Wayland client and display handles;
-7. socket fds;
+6. Wayland client and optional display handles;
+7. socket fds, except raw fds already handed to the host;
 8. the client row.
 
 This keeps children ahead of parents. It also gives hosts a fixed order for

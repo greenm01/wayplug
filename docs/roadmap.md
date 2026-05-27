@@ -24,11 +24,14 @@ Initial smoke coverage:
 - One `wayembed_server_open_client_display` /
   `wayembed_server_close_client_display` cycle completes without
   outstanding resources.
+- One `wayembed_server_open_client_fd` / `wayembed_server_close_client`
+  cycle completes without leaking server state or fd ownership.
 
 ## Phase 1: Minimal Delegated Server
 
 - Create/destroy server.
 - Open/close plugin client display.
+- Open/close plugin client fd for out-of-process handoff.
 - Register core globals:
   - `wl_compositor`
   - `wl_subcompositor`

@@ -28,6 +28,7 @@ pub const feature_keyboard: u64 = 1 << 7;
 pub const feature_touch: u64 = 1 << 8;
 pub const feature_output: u64 = 1 << 9;
 pub const feature_xdg_shell: u64 = 1 << 10;
+pub const feature_client_fd: u64 = 1 << 11;
 const compiled_features: u64 =
     feature_compositor |
     feature_subcompositor |
@@ -39,7 +40,8 @@ const compiled_features: u64 =
     feature_keyboard |
     feature_touch |
     feature_output |
-    feature_xdg_shell;
+    feature_xdg_shell |
+    feature_client_fd;
 pub const embed_status_ok: u32 = 0;
 pub const embed_status_invalid_argument: u32 = 1;
 pub const embed_status_client_closing: u32 = 2;
@@ -391,6 +393,25 @@ export fn wayembed_server_close_client_display(
     return s.closeClientDisplay(d);
 }
 
+export fn wayembed_server_open_client_fd(
+    server: ?*server_mod.Server,
+    out_client: ?*?*wayembed_client,
+) callconv(.c) c_int {
+    const out = out_client orelse return -1;
+    out.* = null;
+    const s = server orelse return -1;
+    return s.openClientFd(out);
+}
+
+export fn wayembed_server_close_client(
+    server: ?*server_mod.Server,
+    client: ?*wayembed_client,
+) callconv(.c) bool {
+    const s = server orelse return false;
+    const c = client orelse return false;
+    return s.closeClient(c);
+}
+
 export fn wayembed_server_create_proxy(
     server: ?*server_mod.Server,
     client_display: ?*wlc.wl_display,
@@ -493,6 +514,8 @@ test "Server null-handle is tolerated" {
     wayembed_server_destroy(null);
     try std.testing.expect(wayembed_server_get_fd(null) == -1);
     try std.testing.expect(!wayembed_server_close_client_display(null, null));
+    try std.testing.expectEqual(@as(c_int, -1), wayembed_server_open_client_fd(null, null));
+    try std.testing.expect(!wayembed_server_close_client(null, null));
     try std.testing.expect(wayembed_server_snapshot(null) == null);
     wayembed_snapshot_free(null);
     try std.testing.expect(!wayembed_snapshot_get_counts(null, null));
