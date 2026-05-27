@@ -51,7 +51,10 @@ The sandbox covers five paths:
 
 Element carries the first opt-in real-host CLAP proof. Its wayembed spike is
 off by default, leaves the XEmbed path intact, and checks that the experimental
-CLAP token can carry a live wayembed display through the host GUI path.
+CLAP token can carry a live wayembed display through the host GUI path. The
+visible embedding path is gated separately with `ELEMENT_WAYEMBED_CLAP_EMBED=1`;
+under JUCE 8.0.12 on Linux it currently reports the missing host parent
+`wl_surface` instead of pretending an X11 window can be used.
 
 These are proof paths, not plugin loaders. Real CLAP and LV2 hosts still own
 bundle loading, plugin instantiation, GUI callbacks, and process management.

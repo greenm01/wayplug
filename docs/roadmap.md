@@ -64,8 +64,9 @@ Initial smoke coverage:
   C code, then embeds the C-created surface.
 - Carla- and Element-oriented integration notes for host-owned plugin glue.
 - Element CLAP proof: opt-in host spike proves the adapter token and display
-  handoff while XEmbed remains the default. Visible embedding waits on parent
-  `wl_surface` access from Element or JUCE.
+  handoff while XEmbed remains the default. Visible embedding has its own
+  runtime gate and now reports the JUCE 8.0.12 blocker: no parent `wl_surface`
+  is exposed to Element.
 
 ## Phase 4: Performance and Completeness
 

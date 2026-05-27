@@ -45,6 +45,10 @@ current Phase 2 embedded UI path are complete:
   LV2-shaped handoff order smokes plus a live embed smoke.
 - Element has an opt-in CLAP spike that keeps XEmbed as the default and proves
   the adapter token/display handoff path without mapping pixels.
+- Element now has a second opt-in visible-embed gate
+  (`ELEMENT_WAYEMBED_CLAP_EMBED=1`). The first spike pass confirms the current
+  blocker: JUCE 8.0.12's Linux peer exposes an X11 native window, not the
+  Wayland `wl_surface` and globals that `wayembed_embed_attach()` needs.
 - GitHub Actions runs the pinned Zig formatter, default test suite, and a
   required Weston smoke path on Linux.
 
@@ -89,7 +93,9 @@ plugin fixture, so the display handoff is proven outside Nim too. Host-facing
 notes describe the Carla/Element-shaped glue path. Element now carries the
 first opt-in real-host CLAP spike: it accepts the wayembed token, passes the
 display handoff through `clap_plugin_gui.set_parent()`, and leaves XEmbed as
-the default. Full CLAP/LV2 runtime helpers and visible real-host embedding
+the default. The visible-embed path is now gated separately and logs a clear
+blocker when the host parent `wl_surface` is unavailable. Full CLAP/LV2
+runtime helpers and a JUCE or host API that exposes a parent `wl_surface`
 remain future work.
 
 ### Linux dmabuf
