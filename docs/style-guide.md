@@ -63,7 +63,7 @@ uint32_t wayplug_abi_version(void);
 
 Keep data passive.
 
-The `src/types/` layer defines records, ids, enums, and flags. It should not
+`src/data/types.zig` defines records, ids, enums, and flags. It should not
 own protocol forwarding, cleanup policy, or cross-table mutation.
 
 Good:
@@ -90,8 +90,20 @@ pub const Embed = struct {
 };
 ```
 
-Cross-table behavior belongs in `src/ops/`. Policy belongs in `src/systems/`.
-Protocol translation belongs in `src/protocol/`.
+Cross-table mutation and policy both belong in `src/engine/<domain>.zig`,
+together with that domain's queries. Protocol translation belongs in
+`src/protocol/`.
+
+## Generic Walkers
+
+Comptime `@typeInfo()` is the right tool for code that operates *across*
+record types: snapshot serialization, per-table invariant checks,
+diagnostic dumps. `src/data/snapshot.zig` and `src/data/invariants.zig`
+use it so adding a record to `src/data/model.zig` extends both for free.
+
+Generic walkers stay out of hot paths. Protocol forwarding uses direct
+field access and named lookups; the `@typeInfo()` cost is paid at comptime
+for diagnostics and tests, never per-dispatch.
 
 ## Single Lookup
 
@@ -271,19 +283,47 @@ protocol error
 
 ## Tests
 
-Scale tests to risk.
+Tests use a hybrid layout: `test` blocks at the bottom of each `src/`
+file for unit coverage of internal helpers and pure data operations; a
+`tests/` directory for integration, cross-domain, and ABI tests.
 
-- Pure data and operations should have unit tests.
-- C ABI changes should update `tests/c_abi_smoke.c`.
-- Protocol delegate changes should get smoke tests where feasible.
-- Teardown logic should include tests for partially-created and already-dead
-  objects.
+In-file blocks sit below a clear separator at the end of the file:
 
-Run:
+```zig
+// ===== production code above =====
 
-```sh
-zig build test
+const std = @import("std");
+const testing = std.testing;
+
+test "insert/delete round-trip" {
+    // ...
+}
 ```
+
+The separator keeps tests visually grouped after the module body. In-file
+tests can reach non-`pub` symbols, which is why this layer carries the
+internal-helper coverage.
+
+The `tests/` directory holds:
+
+```text
+tests/
+  c_abi_smoke.c            ABI surface, compiled via zig cc
+  data_tests.zig           cross-module data invariants
+  engine_tests.zig         cross-domain lifecycle
+  protocol_smoke_tests.zig end-to-end protocol exercise
+```
+
+Both layers run under `zig build test`.
+
+Coverage rules:
+
+- Pure data and operations get in-file unit tests.
+- C ABI changes update `tests/c_abi_smoke.c`.
+- Protocol delegate changes get smoke tests in
+  `tests/protocol_smoke_tests.zig` where feasible.
+- Teardown logic includes tests for partially-created and already-dead
+  objects.
 
 ## Comments
 
@@ -299,15 +339,31 @@ Use comments for:
 
 Avoid comments that restate the code.
 
-## Source Size
+## File Size
 
-Keep files focused.
+Soft target: 500 lines per `.zig` file. Hard guideline: 800. A file
+crossing 500 should be reviewed for a split; a file at 800 splits.
 
-Split a module when it starts mixing domains, for example:
+Concrete rules:
+
+- **One file per Wayland interface in `protocol/`.** Do not bundle
+  `seat` + `pointer` + `keyboard` + `touch`, do not bundle
+  `xdg_surface` + `xdg_toplevel` + `xdg_popup`. The C++ reference's
+  430-line `seatdelegates.cpp` and 550-line `xdgsurfacedelegate.cpp`
+  are the failure mode this rule prevents.
+- **One file per domain in `engine/`** until it crosses ~500 lines.
+  Then promote the domain to a directory: `engine/embed.zig` becomes
+  `engine/embed/embed.zig` (facade) plus the sub-files that exposed
+  the split.
+- **`c_api.zig`** splits by API surface area (`c_api/server.zig`,
+  `c_api/embed.zig`) if it grows past the soft target.
+
+Split a module also when it starts mixing domains:
 
 - protocol forwarding plus policy
 - data records plus operations
 - query helpers plus mutation
 - C ABI validation plus protocol implementation
 
-Small modules make protocol behavior easier to audit.
+Small focused files keep protocol behavior easier to audit and read
+under the context budgets of both human review and AI assistants.

@@ -56,6 +56,17 @@ such as `wl_compositor`, `wl_subcompositor`, `wl_surface`, `wl_shm`,
 `wayplug` should learn from that design, but expose a C ABI and keep plugin
 framework integration explicit.
 
+## Structural Divergence
+
+The C++ reference has no centralized ops layer: each protocol delegate mutates
+its own state directly and the `WaylandServer` singleton just tracks per-client
+resource lists. `wayplug` introduces an explicit `engine/` layer that owns all
+cross-table mutation and the policy decisions above protocol mechanics, while
+keeping hot-path forwarding direct in `protocol/`. The cost is one extra
+indirection on lifecycle paths; the benefit is a single grep-able place to
+find every state transition, which is where delegate libraries usually break.
+See [architecture.md](architecture.md) for the layer breakdown.
+
 ## Public Boundary
 
 The public API should be C:

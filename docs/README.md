@@ -3,9 +3,10 @@
 ## Architecture
 
 - [Architecture](architecture.md) — module shape, runtime flow, ownership
-- [Data-Oriented Design](dod.md) — types, state, ops, queries, systems
+- [Data-Oriented Design](dod.md) — `data/` model, `engine/` operations, queries, policy
 - [Style Guide](style-guide.md) — Zig style, C ABI rules, naming, ownership
 - [C ABI Sketch](c-abi-sketch.md) — provisional public C boundary
+- [Host Integration](host-integration.md) — Carla-style end-to-end walkthrough
 
 ## Context
 

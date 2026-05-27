@@ -7,6 +7,24 @@
 - Keep public API C from the first commit.
 - Build a tiny C test harness to enforce ABI cleanliness.
 
+### Test Harness Wiring
+
+`tests/c_abi_smoke.c` is the C-side ABI smoke test. `build.zig` adds it as
+a `b.addExecutable` step compiled via `zig cc`, linked against the static
+`wayplug` library and `include/wayplug.h`. `zig build test` runs it
+alongside the Zig unit tests.
+
+Initial smoke coverage:
+
+- `wayplug_abi_version()` returns the version `WAYPLUG_ABI_VERSION`
+  declares.
+- Opaque handles round-trip through create/destroy without dereferencing.
+- `wayplug_server_create` / `wayplug_server_destroy` is balanced under a
+  leak-detecting allocator wired through the Zig test wrapper.
+- One `wayplug_server_open_client_display` /
+  `wayplug_server_close_client_display` cycle completes without
+  outstanding resources.
+
 ## Phase 1: Minimal Delegated Server
 
 - Create/destroy server.

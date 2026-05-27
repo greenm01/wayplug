@@ -24,8 +24,8 @@ this file adds the operational details an agent needs to act safely.
    ABI compatibility unless the ABI version is intentionally changed.
 9. Keep source files small and focused. If a file grows too broad, split it by
    domain according to `docs/architecture.md`.
-10. Keep data separate from logic. Follow `docs/dod.md` when touching runtime
-    state, resource ownership, operations, queries, or systems.
+10. Keep data separate from logic. Follow `docs/dod.md` when touching the
+    `data/` model, `engine/` operations, queries, or policy code.
 11. Follow `docs/style-guide.md` for Zig style, C ABI rules, naming, ownership,
     error handling, and module boundaries.
 12. Re-read `docs/architecture.md`, `docs/dod.md`, and
@@ -34,16 +34,16 @@ this file adds the operational details an agent needs to act safely.
 
 ## Architecture Direction
 
-The runtime model is the source of truth. Production code should not rebuild a
-parallel Wayland-shaped object graph or bypass the state/query/operation layer.
+The runtime model is the source of truth. Production code should not rebuild
+a parallel Wayland-shaped object graph or bypass the engine facade.
 
-When changing runtime, state, protocol, or systems code:
+When changing `data/`, `engine/`, or `protocol/` code:
 
 1. Prefer indexed queries and iterators over allocation-returning helpers in hot
    dispatch paths.
-2. Keep mutation centralized in `src/ops/`. Protocol delegates and systems
-   should use `src/state/engine.zig` instead of reaching into tables or indexes
-   directly.
+2. Keep mutation centralized in `src/engine/`. Protocol delegates and
+   `c_api.zig` should use `src/engine/engine.zig` instead of reaching into
+   `src/data/` tables or indexes directly.
 3. Keep protocol code as a thin adapter: translate Wayland callbacks into
    direct forwarding for simple requests, or into operations for lifecycle
    changes.
@@ -53,8 +53,8 @@ When changing runtime, state, protocol, or systems code:
 5. Use operations for lifecycle-sensitive events such as client connect/close,
    resource create/destroy, surface role assignment, subsurface creation, embed
    resize/destroy, protocol errors, and parent-surface withdrawal.
-6. Keep host policy above protocol mechanics. Protocol delegates validate and
-   translate; systems decide policy.
+6. Keep host policy above protocol mechanics. Protocol delegates validate
+   and translate; the engine decides policy.
 
 ## C ABI Rules
 

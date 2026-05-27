@@ -13,9 +13,10 @@ diagnostics, and tests.
 
 Separate data from code.
 
-Types define records, ids, enums, and flags. They do not own protocol behavior.
-State owns storage and indexes. Operations mutate state. Systems make policy
-decisions. Protocol modules translate Wayland callbacks.
+The `data/` layer defines records and owns storage. The `engine/` layer holds
+code that operates on the data — mutation, queries, and policy live together
+per domain, in one file. Protocol modules translate Wayland callbacks and
+either forward directly or call into the engine.
 
 ```text
 protocol callback
@@ -36,41 +37,27 @@ internal relationships.
 
 ## Module Layout
 
-Use a layered split.
+Two directories carry the model: `data/` holds the schema and storage,
+`engine/` holds the code that operates on it. Each engine file is sliced by
+domain rather than by mutation/query/policy — the boundary lives in
+function naming inside the file, not in the directory tree.
 
 ```text
-src/types/
-  core.zig
-  client.zig
+src/data/
+  types.zig         records, ids, enums, flags
+  model.zig         EntityManagers, indexes, id counters
+  snapshot.zig      generic snapshot walker
+  invariants.zig    generic invariant walker
+
+src/engine/
+  engine.zig        facade
+  client.zig        ops, queries, policy for clients
   resource.zig
   surface.zig
   buffer.zig
   embed.zig
   output.zig
-  model.zig
-
-src/state/
-  entity_manager.zig
-  id_gen.zig
-  iterators.zig
-  queries.zig
-  invariants.zig
-  snapshot.zig
-  engine.zig
-
-src/ops/
-  client_ops.zig
-  resource_ops.zig
-  surface_ops.zig
-  buffer_ops.zig
-  embed_ops.zig
-  output_ops.zig
-
-src/systems/
-  lifecycle.zig
-  embed_policy.zig
-  input_translation.zig
-  diagnostics.zig
+  effects.zig       per-dispatch effect queue
 
 src/protocol/
   server.zig
@@ -83,8 +70,9 @@ src/protocol/
   output.zig
 ```
 
-`state/engine.zig` should be the facade. Protocol and systems code should use
-that facade instead of reaching into raw tables and indexes.
+`engine/engine.zig` is the facade. Protocol and `c_api.zig` go through it
+rather than reaching into `data/` directly. The protocol layer keeps direct
+forwarding for hot paths; lifecycle and mutation go through the engine.
 
 ## Types
 
@@ -282,7 +270,10 @@ Queries hide table/index details from protocol and systems code.
 
 ## Operations
 
-All cross-table mutation should happen through operations.
+All cross-table mutation goes through operation functions. They live in the
+relevant `engine/<domain>.zig` file alongside that domain's queries and
+policy. Naming: prefer verb-first (`clientCreate`, `embedAttachChild`) so a
+grep for `pub fn .*Create\|.*Destroy\|.*Attach` surfaces every mutation.
 
 ```text
 clientCreate()
@@ -334,18 +325,22 @@ directions.
 
 ## Systems
 
-Systems express policy and behavior over the model.
+Policy and behavior over the model live as functions inside the same
+`engine/<domain>.zig` file as the domain's ops. No separate `systems/`
+directory: an embed resize decision and the `embedResize` mutation it
+triggers share types, share indexes, and read together.
 
-Initial systems:
+Domain-level concerns:
 
-- lifecycle cleanup
-- embed resize handling
-- input coordinate translation
-- popup/toplevel policy
-- diagnostics and snapshots
+- lifecycle cleanup (in `engine/client.zig`)
+- embed resize handling (`engine/embed.zig`)
+- input coordinate translation (`engine/embed.zig` or a dedicated
+  `engine/input.zig` once seat support lands)
+- popup/toplevel policy (`engine/surface.zig`)
+- diagnostics (`engine/engine.zig` or a dedicated diagnostics module)
 
-Systems read through queries and mutate through ops. They should not own
-protocol resources independently.
+Policy functions read through queries and mutate through ops. They do not
+own protocol resources independently.
 
 Example policy questions:
 
@@ -476,6 +471,12 @@ Examples:
 Invariant checks should be cheap enough for tests and diagnostics, not
 necessarily for every dispatch in production.
 
+`data/invariants.zig` is comptime-generic over the model's tables. Per-table
+checks (no holes, no destroyed entries in indexes, dense/sparse mapping
+consistent) come for free when a new record type is added to `model.zig`.
+Relationship invariants — anything that crosses tables — stay explicit,
+because they encode domain knowledge `@typeInfo()` cannot infer.
+
 ## Snapshots
 
 Diagnostics should expose snapshots instead of raw internal tables.
@@ -503,6 +504,12 @@ A snapshot is caller-owned. The snapshot function allocates with the server
 allocator and returns a value the caller releases with `snapshotFree()`. The
 C ABI exposes a matching `wayplug_snapshot_free()`. A snapshot is a copy;
 subsequent ops do not invalidate it.
+
+`data/snapshot.zig` is comptime-generic. It walks every table in `model.zig`
+using `@typeInfo()` and copies records into the snapshot structure. New
+record types appear in the snapshot automatically. Hand-written conversions
+are only needed for fields that should be redacted or transformed at the
+boundary.
 
 ## Good Split
 
@@ -545,6 +552,7 @@ Avoid this for every request:
 Msg -> update(Model) -> Cmd -> Wayland call
 ```
 
-That pattern is too indirect for protocol forwarding. The useful part is the
-separation of data, indexes, operations, queries, systems, and adapters. Apply
-that separation where it clarifies ownership and cleanup.
+That pattern is too indirect for protocol forwarding. The useful part is
+the separation between `data/` (records, storage, indexes) and `engine/`
+(operations, queries, policy), and between both of those and the protocol
+adapters. Apply that separation where it clarifies ownership and cleanup.

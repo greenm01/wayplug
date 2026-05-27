@@ -62,38 +62,21 @@ wayplug/
     host.zig
     errors.zig
 
-    types/
-      core.zig
-      client.zig
+    data/
+      types.zig         records, ids, enums, flags
+      model.zig         EntityManagers, indexes, id counters
+      snapshot.zig      generic snapshot walker
+      invariants.zig    generic invariant walker
+
+    engine/
+      engine.zig        facade used by protocol and c_api
+      client.zig        ops, queries, policy for clients
       resource.zig
       surface.zig
       buffer.zig
       embed.zig
       output.zig
-      model.zig
-
-    state/
-      entity_manager.zig
-      id_gen.zig
-      iterators.zig
-      queries.zig
-      invariants.zig
-      snapshot.zig
-      engine.zig
-
-    ops/
-      client_ops.zig
-      resource_ops.zig
-      surface_ops.zig
-      buffer_ops.zig
-      embed_ops.zig
-      output_ops.zig
-
-    systems/
-      lifecycle.zig
-      embed_policy.zig
-      input_translation.zig
-      diagnostics.zig
+      effects.zig       per-dispatch effect queue
 
     protocol/
       server_display.zig
@@ -114,18 +97,26 @@ wayplug/
 
   tests/
     c_abi_smoke.c
-    state_tests.zig
-    ops_tests.zig
+    data_tests.zig
+    engine_tests.zig
     protocol_smoke_tests.zig
 
   docs/
     architecture.md
     dod.md
+    style-guide.md
+    host-integration.md
     protocol-landscape.md
     wsd-architecture.md
     c-abi-sketch.md
     roadmap.md
 ```
+
+Each `engine/<domain>.zig` owns mutation, queries, and policy for that
+domain. Splitting `ops` and `systems` across separate top-level trees would
+spread one domain's behavior across two directories without making the
+mutation/policy distinction any clearer at call sites; keeping a domain in
+one file lets the boundary live in function names instead.
 
 ## Module Roles
 
@@ -142,23 +133,21 @@ together host callbacks, state, protocol setup, dispatch, flush, and teardown.
 `src/host.zig` wraps the host-provided callback table. Internal code should use
 this wrapper instead of reaching into the C ABI struct directly.
 
-`src/types/` contains passive records only: ids, enums, flags, and data shapes.
-No protocol forwarding or cleanup policy should live here.
+`src/data/` holds the model. `types.zig` defines passive records, ids,
+enums, and flags. `model.zig` holds the `EntityManager` tables, indexes,
+and id counters. `snapshot.zig` and `invariants.zig` are comptime-generic
+walkers — adding a record type to `model.zig` gives it snapshot output and
+per-table invariant coverage without per-domain plumbing.
 
-`src/state/` owns storage, indexes, queries, iterators, snapshots, and invariant
-checks. `state/engine.zig` should be the facade used by protocol and systems
-code.
+`src/engine/` holds the code that operates on the model. `engine.zig` is
+the facade used by `protocol/` and `c_api.zig`. Each `<domain>.zig`
+(client, surface, embed, etc.) owns mutation, queries, and policy for that
+domain. `effects.zig` owns the per-dispatch effect queue. Hot-path
+forwarding stays in `protocol/`; the engine handles lifecycle.
 
-`src/ops/` owns cross-table mutation. If an action creates, destroys, or
-relinks more than one kind of object, it belongs here.
-
-`src/systems/` owns policy and behavior above protocol mechanics: lifecycle
-cleanup, embed sizing, input coordinate translation, diagnostics, and future
-popup/toplevel rules.
-
-`src/protocol/` contains libwayland server/client delegate code. These modules
-translate callbacks, validate ownership, forward simple requests, and call ops
-for lifecycle changes.
+`src/protocol/` contains libwayland server/client delegate code. These
+modules translate callbacks, validate ownership, forward simple requests,
+and call into `engine/` for lifecycle changes.
 
 `src/wayland/` is a thin binding/helper layer around generated Wayland
 interfaces and C imports. It should not own Wayplug state.
@@ -273,8 +262,9 @@ these callbacks synchronously from inside `wayplug_server_dispatch()`.
 Rules:
 
 - Callbacks return `void`. They report; they do not gate. Policy decisions
-  belong in `src/systems/` and run before the notification fires.
-- Callbacks must not call back into `wayplug`. Re-entrancy is undefined.
+  belong in `src/engine/` and run before the notification fires.
+- Callbacks must not call back into the same `wayplug_server` instance.
+  They may issue Wayland calls on the host's own upstream connection.
 - A null function pointer in the host interface is a no-op.
 - The engine drains its effect queue at the end of each dispatch tick, after
   every protocol callback for that tick has run.

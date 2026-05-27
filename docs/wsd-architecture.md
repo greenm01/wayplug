@@ -1,5 +1,10 @@
 # wayland-server-delegate Architecture
 
+> *Reference document. Describes the C++ `wayland-server-delegate` prior
+> art for context. Not a contract for wayplug; see
+> [architecture.md](architecture.md) and [roadmap.md](roadmap.md) for
+> what wayplug itself does.*
+
 This note describes the architecture of `wayland-server-delegate` as prior art
 for `wayplug`.
 
