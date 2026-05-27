@@ -43,7 +43,7 @@ current Phase 2 embedded UI path are complete:
   handoff tokens and validated display/resize structs.
 - `wayembed-sandbox` proves the Phase 3 C ABI from Nim with CLAP-shaped and
   LV2-shaped handoff order smokes, C fixture handoff smokes, and a live embed
-  smoke.
+  smoke for both in-process display and raw-fd client handoff.
 - Element has an opt-in CLAP spike that keeps XEmbed as the default and proves
   the adapter token/display handoff path without mapping pixels.
 - Element now has a second opt-in visible-embed gate

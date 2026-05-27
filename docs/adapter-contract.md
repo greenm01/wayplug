@@ -39,11 +39,13 @@ The Phase 3 proof lives in
 [wayembed-sandbox](https://github.com/greenm01/wayembed-sandbox). It is a
 Nim host on purpose: it proves the C ABI from outside C and Zig.
 
-The sandbox covers six paths:
+The sandbox covers seven paths:
 
 - `abi-smoke` checks adapter handoff and resize validation from Nim.
 - `embed-smoke` opens a live host surface, creates one plugin surface, and
   embeds it through `on_surface_created`.
+- `fd-embed-smoke` opens a raw client fd, connects a plugin-side display to
+  that fd, and embeds the plugin-created surface.
 - `clap-order-smoke` checks the CLAP-shaped display handoff order.
 - `clap-c-plugin-smoke` passes the CLAP display handoff into a tiny C Wayland
   plugin fixture and embeds the fixture-created surface.
