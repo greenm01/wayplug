@@ -4,8 +4,9 @@ This document shows the host calls needed to embed a Wayland-native plugin
 editor. The examples are Carla-shaped: a Qt audio plugin host with its own
 Wayland connection and an editor area inside a host window.
 
-The public ABI in [../include/wayembed.h](../include/wayembed.h) is the source
-of truth. If this walkthrough is awkward to write, the ABI needs work.
+The public ABI in [../include/wayembed.h](../include/wayembed.h) and
+[../include/wayembed_adapters.h](../include/wayembed_adapters.h) is the
+source of truth. If this walkthrough is awkward to write, the ABI needs work.
 
 ## Feature Discovery
 
@@ -202,8 +203,10 @@ callbacks run on that thread. A recursive dispatch call is ignored.
 
 ## Opening A Plugin Display
 
-When the plugin asks for a Wayland UI, open a plugin-side display and pass it
-through the plugin format glue.
+When the plugin asks for a Wayland UI, open a plugin-side display and pass the
+adapter handoff through the plugin format glue. The handoff token is
+wayembed-specific. Do not use upstream floating-window Wayland support as the
+embedding contract.
 
 ```c
 struct wl_display *plugin_display =
@@ -213,16 +216,30 @@ if (!plugin_display) {
     return CLAP_WINDOW_API_FAILED;
 }
 
-clap_window_t window = {
-    .api = CLAP_WINDOW_API_WAYLAND,
-    .wayland = plugin_display,
+wayembed_adapter_handoff handoff = {
+    .size = sizeof(handoff),
 };
+
+if (!wayembed_adapter_handoff_init(&handoff,
+                                   WAYEMBED_ADAPTER_FORMAT_CLAP,
+                                   server,
+                                   plugin_display)) {
+    return CLAP_WINDOW_API_FAILED;
+}
+
+carla_experimental_wayland_window window = {
+    .api = handoff.format_token,
+    .display = handoff.display,
+};
+
 plugin_gui->set_parent(plugin, &window);
 plugin_gui->show(plugin);
 ```
 
 The plugin sees a normal `wl_display *`: bind globals, create a surface, attach
-buffers, and commit.
+buffers, and commit. The plugin also has to understand the wayembed token. A
+plugin that only asks for upstream floating Wayland support is outside this
+embedded path.
 
 ## Opening A Plugin Fd
 
@@ -254,6 +271,26 @@ wayembed_server_close_client(server, plugin_client);
 close(plugin_fd);
 wayembed_server_dispatch(server);
 ```
+
+## Carla And Element Notes
+
+Carla and Element already own the plugin-format layer. wayembed should sit
+under that layer, not replace it.
+
+For CLAP, the host opens a wayembed display before GUI creation, initializes a
+`WAYEMBED_ADAPTER_FORMAT_CLAP` handoff, and passes
+`WAYEMBED_ADAPTER_CLAP_EXPERIMENTAL_API` plus the display through its
+experimental plugin glue. The host still calls the CLAP GUI callbacks. The
+plugin still creates the `wl_surface`.
+
+For LV2, the host advertises `WAYEMBED_ADAPTER_LV2_EXPERIMENTAL_URI` only to
+UIs that opt in. The LV2 feature payload carries the wayembed display. The host
+keeps ownership of the server, display, and embed handle.
+
+The shared editor path stays the same for both formats: `on_surface_created`
+calls `wayembed_embed_attach()` with the host editor parent surface, resize
+calls `wayembed_embed_resize()`, hide or destroy closes the plugin display or
+client fd, and `on_client_closed` clears the host's per-editor state.
 
 ## Embedded Surface Contract
 

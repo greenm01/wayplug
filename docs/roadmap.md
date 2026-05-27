@@ -60,7 +60,7 @@ Initial smoke coverage:
   order.
 - Tiny host/plugin examples: `wayembed-sandbox` opens a live host surface and
   embeds one plugin-created surface through the C ABI.
-- Carla-oriented integration notes.
+- Carla- and Element-oriented integration notes for host-owned plugin glue.
 
 ## Phase 4: Performance and Completeness
 

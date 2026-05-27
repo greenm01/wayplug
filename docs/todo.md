@@ -82,8 +82,9 @@ Per [roadmap.md](roadmap.md) Phase 4. Defer until lifecycle is stable.
 Per [roadmap.md](roadmap.md) Phase 3. The core stays format-neutral; the
 first experimental handoff contract lives in `include/wayembed_adapters.h`
 and [adapter-contract.md](adapter-contract.md). `wayembed-sandbox` is the
-current proof harness. Full CLAP/LV2 runtime helpers and real host
-integrations remain future work.
+current proof harness. Host-facing notes now describe the Carla/Element-shaped
+glue path. Full CLAP/LV2 runtime helpers and real host integrations remain
+future work.
 
 ### Linux dmabuf
 

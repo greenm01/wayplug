@@ -50,6 +50,22 @@ The sandbox covers four paths:
 These are proof paths, not plugin loaders. Real CLAP and LV2 hosts still own
 bundle loading, plugin instantiation, GUI callbacks, and process management.
 
+## Host Responsibilities
+
+wayembed does not load plugins, scan bundles, negotiate CLAP extensions, build
+LV2 feature arrays, or call plugin UI entry points. The host already owns those
+jobs.
+
+The adapter contract gives that host a small Wayland payload: a display, a
+format token or URI, and resize validation. The host decides when a plugin UI
+starts, how the format-native object carries the payload, and when teardown
+begins.
+
+Keep all format policy in host glue. Keep wayembed calls in the embedding
+layer: create the server, open the plugin display or fd, attach the first
+role-less surface the host wants to embed, resize the active embed, and close
+the client when the editor ends.
+
 ## CLAP Mapping
 
 Use `WAYEMBED_ADAPTER_CLAP_EXPERIMENTAL_API` as the experimental API token.
