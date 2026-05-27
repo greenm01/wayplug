@@ -1,4 +1,4 @@
-//! Internal server runtime behind the opaque `wayplug_server` handle.
+//! Internal server runtime behind the opaque `wayembed_server` handle.
 //! Owns the engine, the host wrapper, and the upstream event queue.
 
 const std = @import("std");
@@ -52,7 +52,7 @@ pub const ResourceData = struct {
 pub const Server = struct {
     allocator: std.mem.Allocator,
     engine: engine_mod.Engine,
-    host_iface: c_api.WayplugHostInterface,
+    host_iface: c_api.WayembedHostInterface,
     host: host_mod.Host,
     display: *wls.wl_display,
     event_loop: *wls.wl_event_loop,
@@ -62,7 +62,7 @@ pub const Server = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
-        iface: *const c_api.WayplugHostInterface,
+        iface: *const c_api.WayembedHostInterface,
         queue: ?*wlc.wl_event_queue,
     ) !*Server {
         const display = wls.c.wl_display_create() orelse return error.OutOfMemory;
@@ -557,7 +557,7 @@ pub const Server = struct {
     }
 };
 
-fn opaqueClient(handle: ?*ClientHandle) ?*c_api.wayplug_client {
+fn opaqueClient(handle: ?*ClientHandle) ?*c_api.wayembed_client {
     return if (handle) |h| @ptrCast(h) else null;
 }
 
@@ -571,7 +571,7 @@ const registry_bindings = protocol_registry.Bindings(Server, ResourceData);
 // ===== production code above =====
 
 const ProtocolErrorTestState = struct {
-    client: ?*c_api.wayplug_client = null,
+    client: ?*c_api.wayembed_client = null,
     code: u32 = 0,
     calls: u32 = 0,
 };
@@ -632,7 +632,7 @@ fn fakeXdgWmBase(userdata: ?*anyopaque) callconv(.c) ?*wlp.xdg_wm_base {
     return @ptrFromInt(0x5000);
 }
 
-fn fakeOutputInfo(userdata: ?*anyopaque, info: *c_api.WayplugOutputInfo) callconv(.c) bool {
+fn fakeOutputInfo(userdata: ?*anyopaque, info: *c_api.WayembedOutputInfo) callconv(.c) bool {
     const state: *RegistryTestState = @ptrCast(@alignCast(userdata.?));
     if (!state.output_enabled) return false;
     info.mode_width = 800;
@@ -654,9 +654,9 @@ fn fakeSubsurfaceOffset(
     return true;
 }
 
-fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
+fn testHostInterface(userdata: ?*anyopaque) c_api.WayembedHostInterface {
     return .{
-        .size = @sizeOf(c_api.WayplugHostInterface),
+        .size = @sizeOf(c_api.WayembedHostInterface),
         .version = c_api.abi_version,
         .userdata = userdata,
         .get_compositor = fakeCompositor,
@@ -681,7 +681,7 @@ fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
 
 fn recordProtocolError(
     userdata: ?*anyopaque,
-    client: ?*c_api.wayplug_client,
+    client: ?*c_api.wayembed_client,
     code: u32,
 ) callconv(.c) void {
     const state: *ProtocolErrorTestState = @ptrCast(@alignCast(userdata.?));
@@ -724,8 +724,8 @@ fn fakeSurface(comptime address: usize) *wlp.wl_surface {
 }
 
 test "Server create and destroy is balanced" {
-    const iface = c_api.WayplugHostInterface{
-        .size = @sizeOf(c_api.WayplugHostInterface),
+    const iface = c_api.WayembedHostInterface{
+        .size = @sizeOf(c_api.WayembedHostInterface),
         .version = c_api.abi_version,
         .userdata = null,
         .get_compositor = null,
@@ -753,8 +753,8 @@ test "Server create and destroy is balanced" {
 
 test "protocol_error effect drains to host callback" {
     var state = ProtocolErrorTestState{};
-    const iface = c_api.WayplugHostInterface{
-        .size = @sizeOf(c_api.WayplugHostInterface),
+    const iface = c_api.WayembedHostInterface{
+        .size = @sizeOf(c_api.WayembedHostInterface),
         .version = c_api.abi_version,
         .userdata = &state,
         .get_compositor = null,
@@ -795,8 +795,8 @@ test "protocol_error effect drains to host callback" {
 }
 
 test "embedded coordinate translation subtracts host subsurface offset" {
-    const iface = c_api.WayplugHostInterface{
-        .size = @sizeOf(c_api.WayplugHostInterface),
+    const iface = c_api.WayembedHostInterface{
+        .size = @sizeOf(c_api.WayembedHostInterface),
         .version = c_api.abi_version,
         .userdata = null,
         .get_compositor = null,
@@ -862,8 +862,8 @@ test "embedded coordinate translation subtracts host subsurface offset" {
 
 test "embed lifecycle effects drain to host callbacks" {
     var state = EmbedCallbackTestState{};
-    const iface = c_api.WayplugHostInterface{
-        .size = @sizeOf(c_api.WayplugHostInterface),
+    const iface = c_api.WayembedHostInterface{
+        .size = @sizeOf(c_api.WayembedHostInterface),
         .version = c_api.abi_version,
         .userdata = &state,
         .get_compositor = null,

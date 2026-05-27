@@ -11,21 +11,21 @@ const wlc = @import("wayland/client.zig");
 const wls = @import("wayland/server.zig");
 const wlp = @import("wayland/protocols.zig");
 
-pub const default_seat_name = "wayplug-seat";
+pub const default_seat_name = "wayembed-seat";
 pub const default_seat_capabilities: u32 = @intCast(wls.c.WL_SEAT_CAPABILITY_POINTER);
 pub const supported_seat_capabilities: u32 =
     @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_POINTER)) |
     @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_KEYBOARD)) |
     @as(u32, @intCast(wls.c.WL_SEAT_CAPABILITY_TOUCH));
-pub const default_output_make: [*:0]const u8 = "wayplug";
+pub const default_output_make: [*:0]const u8 = "wayembed";
 pub const default_output_model: [*:0]const u8 = "delegated-output";
-pub const default_output_name: [*:0]const u8 = "wayplug-0";
-pub const default_output_description: [*:0]const u8 = "wayplug delegated output";
+pub const default_output_name: [*:0]const u8 = "wayembed-0";
+pub const default_output_description: [*:0]const u8 = "wayembed delegated output";
 
 pub const Host = struct {
-    iface: *const c_api.WayplugHostInterface,
+    iface: *const c_api.WayembedHostInterface,
 
-    pub fn init(iface: *const c_api.WayplugHostInterface) Host {
+    pub fn init(iface: *const c_api.WayembedHostInterface) Host {
         return .{ .iface = iface };
     }
 
@@ -67,7 +67,7 @@ pub const Host = struct {
         return f(self.iface.userdata);
     }
 
-    pub fn getOutputInfo(self: Host) ?c_api.WayplugOutputInfo {
+    pub fn getOutputInfo(self: Host) ?c_api.WayembedOutputInfo {
         const f = self.iface.get_output_info orelse return null;
         var info = defaultOutputInfo();
         if (!f(self.iface.userdata, &info)) return null;
@@ -92,13 +92,13 @@ pub const Host = struct {
         return f(self.iface.userdata, x, y, display, parent, child);
     }
 
-    pub fn onClientConnected(self: Host, client: ?*c_api.wayplug_client) void {
+    pub fn onClientConnected(self: Host, client: ?*c_api.wayembed_client) void {
         if (self.iface.on_client_connected) |f| f(self.iface.userdata, client);
     }
 
     pub fn onSurfaceCreated(
         self: Host,
-        client: ?*c_api.wayplug_client,
+        client: ?*c_api.wayembed_client,
         plugin_child_surface: ?*wlp.wl_surface,
     ) void {
         if (self.iface.on_surface_created) |f| {
@@ -106,11 +106,11 @@ pub const Host = struct {
         }
     }
 
-    pub fn onClientClosed(self: Host, client: ?*c_api.wayplug_client) void {
+    pub fn onClientClosed(self: Host, client: ?*c_api.wayembed_client) void {
         if (self.iface.on_client_closed) |f| f(self.iface.userdata, client);
     }
 
-    pub fn onProtocolError(self: Host, client: ?*c_api.wayplug_client, code: u32) void {
+    pub fn onProtocolError(self: Host, client: ?*c_api.wayembed_client, code: u32) void {
         if (self.iface.on_protocol_error) |f| f(self.iface.userdata, client, code);
     }
 
@@ -127,9 +127,9 @@ pub const Host = struct {
     }
 };
 
-pub fn defaultOutputInfo() c_api.WayplugOutputInfo {
+pub fn defaultOutputInfo() c_api.WayembedOutputInfo {
     return .{
-        .size = @sizeOf(c_api.WayplugOutputInfo),
+        .size = @sizeOf(c_api.WayembedOutputInfo),
         .version = c_api.abi_version,
         .x = 0,
         .y = 0,
@@ -149,8 +149,8 @@ pub fn defaultOutputInfo() c_api.WayplugOutputInfo {
     };
 }
 
-fn sanitizeOutputInfo(info: *c_api.WayplugOutputInfo) void {
-    info.size = @sizeOf(c_api.WayplugOutputInfo);
+fn sanitizeOutputInfo(info: *c_api.WayembedOutputInfo) void {
+    info.size = @sizeOf(c_api.WayembedOutputInfo);
     info.version = c_api.abi_version;
     if (info.make == null) info.make = default_output_make;
     if (info.model == null) info.model = default_output_model;
@@ -165,8 +165,8 @@ fn sanitizeOutputInfo(info: *c_api.WayplugOutputInfo) void {
 // ===== production code above =====
 
 test "Host wraps a null-callback interface as no-op" {
-    const iface = c_api.WayplugHostInterface{
-        .size = @sizeOf(c_api.WayplugHostInterface),
+    const iface = c_api.WayembedHostInterface{
+        .size = @sizeOf(c_api.WayembedHostInterface),
         .version = c_api.abi_version,
         .userdata = null,
         .get_compositor = null,
@@ -202,8 +202,8 @@ fn noisySeatCapabilities(_: ?*anyopaque) callconv(.c) u32 {
 }
 
 test "Host masks seat capabilities to supported devices" {
-    const iface = c_api.WayplugHostInterface{
-        .size = @sizeOf(c_api.WayplugHostInterface),
+    const iface = c_api.WayembedHostInterface{
+        .size = @sizeOf(c_api.WayembedHostInterface),
         .version = c_api.abi_version,
         .userdata = null,
         .get_compositor = null,

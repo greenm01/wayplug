@@ -1,5 +1,5 @@
 //! Client-side Wayland protocol object types the host hands across the
-//! `wayplug_host_interface` getters.
+//! `wayembed_host_interface` getters.
 
 const wlc = @import("client.zig");
 const xdg = @import("xdg_client.zig");

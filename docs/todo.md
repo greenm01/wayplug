@@ -13,7 +13,7 @@ current Phase 2 embedded UI path are complete:
 - libwayland is linked through pkg-config.
 - `server.zig` owns a real Wayland display and event loop.
 - client open/close works through real Wayland client/display handles.
-- `wayplug_client` is an opaque stable host handle.
+- `wayembed_client` is an opaque stable host handle.
 - protocol delegates live under `src/protocol/`.
 - registry/global binding validates versions and reports protocol errors.
 - client teardown clears embeds, surfaces, buffers, resources, and indexes.
@@ -21,7 +21,7 @@ current Phase 2 embedded UI path are complete:
   buffer, attach, commit, embed attach, and resize through a shared
   compositor harness.
 - `EntityManager` uses dense storage with sparse id lookup.
-- effects drain from `wayplug_server_dispatch()`.
+- effects drain from `wayembed_server_dispatch()`.
 - `on_protocol_error` is exposed through the host interface.
 - snapshots copy model records and expose C ABI table counts.
 - relationship invariants check dense tables, indexes, and cross-table
@@ -79,7 +79,7 @@ Per [roadmap.md](roadmap.md) Phase 4. Defer until lifecycle is stable.
 ### CLAP and LV2 adapters
 
 Per [roadmap.md](roadmap.md) Phase 3. The core stays format-neutral; the
-first experimental handoff contract lives in `include/wayplug_adapters.h`
+first experimental handoff contract lives in `include/wayembed_adapters.h`
 and [adapter-contract.md](adapter-contract.md). Full CLAP/LV2 runtime
 helpers and examples remain future work.
 
@@ -96,5 +96,5 @@ Out of MVP scope. Companion path for floating plugin windows.
 These came up while writing other docs but did not fit the current scope.
 
 - Keep [wsd-architecture.md](wsd-architecture.md) as a prior-art reference.
-  It is not a contract for wayplug, but it remains useful context for the
+  It is not a contract for wayembed, but it remains useful context for the
   delegated-server model and protocol coverage decisions.

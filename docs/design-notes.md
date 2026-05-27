@@ -20,7 +20,7 @@ Embedded UI:
   slot
 - plugin should draw into a child surface/subsurface
 - host should control geometry and lifecycle
-- this is the main `wayplug` target
+- this is the main `wayembed` target
 
 Floating UI:
 
@@ -53,14 +53,14 @@ It creates a nested delegating Wayland server and forwards common interfaces
 such as `wl_compositor`, `wl_subcompositor`, `wl_surface`, `wl_shm`,
 `wl_seat`, `xdg_wm_base`, and Linux dmabuf.
 
-`wayplug` should learn from that design, but expose a C ABI and keep plugin
+`wayembed` should learn from that design, but expose a C ABI and keep plugin
 framework integration explicit.
 
 ## Structural Divergence
 
 The C++ reference has no centralized ops layer: each protocol delegate mutates
 its own state directly and the `WaylandServer` singleton just tracks per-client
-resource lists. `wayplug` introduces an explicit `engine/` layer that owns all
+resource lists. `wayembed` introduces an explicit `engine/` layer that owns all
 cross-table mutation and the policy decisions above protocol mechanics, while
 keeping hot-path forwarding direct in `protocol/`. The cost is one extra
 indirection on lifecycle paths; the benefit is a single grep-able place to

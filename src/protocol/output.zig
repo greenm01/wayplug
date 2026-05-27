@@ -12,7 +12,7 @@ pub fn create() Delegate {
     return .{};
 }
 
-pub fn sendInitial(resource: *wls.wl_resource, info: c_api.WayplugOutputInfo) void {
+pub fn sendInitial(resource: *wls.wl_resource, info: c_api.WayembedOutputInfo) void {
     const version = wls.c.wl_resource_get_version(resource);
     wls.c.wl_output_send_geometry(
         resource,

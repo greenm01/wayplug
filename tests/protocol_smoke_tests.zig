@@ -4,7 +4,7 @@
 
 const builtin = @import("builtin");
 const std = @import("std");
-const wayplug = @import("wayplug");
+const wayembed = @import("wayembed");
 
 const c = @cImport({
     @cInclude("stdlib.h");
@@ -12,8 +12,8 @@ const c = @cImport({
     @cInclude("unistd.h");
 });
 
-const wlc = wayplug.wayland.client.c;
-const wlp = wayplug.wayland.protocols;
+const wlc = wayembed.wayland.client.c;
+const wlp = wayembed.wayland.protocols;
 
 const SmokeCompositor = enum {
     weston,
@@ -50,34 +50,34 @@ const EnvPair = struct {
 };
 
 test "every protocol delegate has a create() that compiles" {
-    _ = wayplug.protocol.server_display.create();
-    _ = wayplug.protocol.registry.create();
-    _ = wayplug.protocol.compositor.create();
-    _ = wayplug.protocol.surface.create();
-    _ = wayplug.protocol.subcompositor.create();
-    _ = wayplug.protocol.subsurface.create();
-    _ = wayplug.protocol.shm.create();
-    _ = wayplug.protocol.shm_pool.create();
-    _ = wayplug.protocol.buffer.create();
-    _ = wayplug.protocol.callback.create();
-    _ = wayplug.protocol.region.create();
-    _ = wayplug.protocol.seat.create();
-    _ = wayplug.protocol.pointer.create();
-    _ = wayplug.protocol.keyboard.create();
-    _ = wayplug.protocol.touch.create();
-    _ = wayplug.protocol.output.create();
-    _ = wayplug.protocol.xdg_wm_base.create();
-    _ = wayplug.protocol.xdg_positioner.create();
-    _ = wayplug.protocol.xdg_surface.create();
-    _ = wayplug.protocol.xdg_toplevel.create();
-    _ = wayplug.protocol.xdg_popup.create();
+    _ = wayembed.protocol.server_display.create();
+    _ = wayembed.protocol.registry.create();
+    _ = wayembed.protocol.compositor.create();
+    _ = wayembed.protocol.surface.create();
+    _ = wayembed.protocol.subcompositor.create();
+    _ = wayembed.protocol.subsurface.create();
+    _ = wayembed.protocol.shm.create();
+    _ = wayembed.protocol.shm_pool.create();
+    _ = wayembed.protocol.buffer.create();
+    _ = wayembed.protocol.callback.create();
+    _ = wayembed.protocol.region.create();
+    _ = wayembed.protocol.seat.create();
+    _ = wayembed.protocol.pointer.create();
+    _ = wayembed.protocol.keyboard.create();
+    _ = wayembed.protocol.touch.create();
+    _ = wayembed.protocol.output.create();
+    _ = wayembed.protocol.xdg_wm_base.create();
+    _ = wayembed.protocol.xdg_positioner.create();
+    _ = wayembed.protocol.xdg_surface.create();
+    _ = wayembed.protocol.xdg_toplevel.create();
+    _ = wayembed.protocol.xdg_popup.create();
 }
 
 test "active protocol bindings instantiate against server runtime" {
-    const Server = wayplug.server.Server;
-    const ResourceData = wayplug.server.ResourceData;
+    const Server = wayembed.server.Server;
+    const ResourceData = wayembed.server.ResourceData;
 
-    const Registry = wayplug.protocol.registry.Bindings(Server, ResourceData);
+    const Registry = wayembed.protocol.registry.Bindings(Server, ResourceData);
     _ = Registry.bindCompositor;
     _ = Registry.bindSubcompositor;
     _ = Registry.bindShm;
@@ -85,50 +85,50 @@ test "active protocol bindings instantiate against server runtime" {
     _ = Registry.bindOutput;
     _ = Registry.bindXdgWmBase;
 
-    const Compositor = wayplug.protocol.compositor.Bindings(Server, ResourceData);
+    const Compositor = wayembed.protocol.compositor.Bindings(Server, ResourceData);
     _ = Compositor.impl;
-    const Surface = wayplug.protocol.surface.Bindings(Server, ResourceData);
+    const Surface = wayembed.protocol.surface.Bindings(Server, ResourceData);
     _ = Surface.impl;
-    const Subcompositor = wayplug.protocol.subcompositor.Bindings(Server, ResourceData);
+    const Subcompositor = wayembed.protocol.subcompositor.Bindings(Server, ResourceData);
     _ = Subcompositor.impl;
-    const Subsurface = wayplug.protocol.subsurface.Bindings(Server, ResourceData);
+    const Subsurface = wayembed.protocol.subsurface.Bindings(Server, ResourceData);
     _ = Subsurface.impl;
-    const Shm = wayplug.protocol.shm.Bindings(Server, ResourceData);
+    const Shm = wayembed.protocol.shm.Bindings(Server, ResourceData);
     _ = Shm.impl;
-    const ShmPool = wayplug.protocol.shm_pool.Bindings(Server, ResourceData);
+    const ShmPool = wayembed.protocol.shm_pool.Bindings(Server, ResourceData);
     _ = ShmPool.impl;
-    const Buffer = wayplug.protocol.buffer.Bindings(Server, ResourceData);
+    const Buffer = wayembed.protocol.buffer.Bindings(Server, ResourceData);
     _ = Buffer.impl;
     _ = Buffer.listener;
-    const Callback = wayplug.protocol.callback.Bindings(Server, ResourceData);
+    const Callback = wayembed.protocol.callback.Bindings(Server, ResourceData);
     _ = Callback.listener;
-    const Region = wayplug.protocol.region.Bindings(Server, ResourceData);
+    const Region = wayembed.protocol.region.Bindings(Server, ResourceData);
     _ = Region.impl;
-    const Seat = wayplug.protocol.seat.Bindings(Server, ResourceData);
+    const Seat = wayembed.protocol.seat.Bindings(Server, ResourceData);
     _ = Seat.impl;
-    const Pointer = wayplug.protocol.pointer.Bindings(Server, ResourceData);
+    const Pointer = wayembed.protocol.pointer.Bindings(Server, ResourceData);
     _ = Pointer.impl;
     _ = Pointer.listener;
-    const Keyboard = wayplug.protocol.keyboard.Bindings(Server, ResourceData);
+    const Keyboard = wayembed.protocol.keyboard.Bindings(Server, ResourceData);
     _ = Keyboard.impl;
     _ = Keyboard.listener;
-    const Touch = wayplug.protocol.touch.Bindings(Server, ResourceData);
+    const Touch = wayembed.protocol.touch.Bindings(Server, ResourceData);
     _ = Touch.impl;
     _ = Touch.listener;
-    const Output = wayplug.protocol.output.Bindings(Server, ResourceData);
+    const Output = wayembed.protocol.output.Bindings(Server, ResourceData);
     _ = Output.impl;
-    const XdgWmBase = wayplug.protocol.xdg_wm_base.Bindings(Server, ResourceData);
+    const XdgWmBase = wayembed.protocol.xdg_wm_base.Bindings(Server, ResourceData);
     _ = XdgWmBase.impl;
     _ = XdgWmBase.listener;
-    const XdgPositioner = wayplug.protocol.xdg_positioner.Bindings(Server, ResourceData);
+    const XdgPositioner = wayembed.protocol.xdg_positioner.Bindings(Server, ResourceData);
     _ = XdgPositioner.impl;
-    const XdgSurface = wayplug.protocol.xdg_surface.Bindings(Server, ResourceData);
+    const XdgSurface = wayembed.protocol.xdg_surface.Bindings(Server, ResourceData);
     _ = XdgSurface.impl;
     _ = XdgSurface.listener;
-    const XdgToplevel = wayplug.protocol.xdg_toplevel.Bindings(Server, ResourceData);
+    const XdgToplevel = wayembed.protocol.xdg_toplevel.Bindings(Server, ResourceData);
     _ = XdgToplevel.impl;
     _ = XdgToplevel.listener;
-    const XdgPopup = wayplug.protocol.xdg_popup.Bindings(Server, ResourceData);
+    const XdgPopup = wayembed.protocol.xdg_popup.Bindings(Server, ResourceData);
     _ = XdgPopup.impl;
     _ = XdgPopup.listener;
 }
@@ -168,7 +168,7 @@ const HostSmokeState = struct {
 };
 
 const ServerThreadContext = struct {
-    server: *wayplug.server.Server,
+    server: *wayembed.server.Server,
     running: std.atomic.Value(bool) = .init(true),
 
     fn run(self: *@This()) void {
@@ -334,16 +334,16 @@ fn hostXdgWmBase(userdata: ?*anyopaque) callconv(.c) ?*wlp.xdg_wm_base {
     return state.xdg_wm_base;
 }
 
-fn hostOutputInfo(userdata: ?*anyopaque, info: *wayplug.c_api.WayplugOutputInfo) callconv(.c) bool {
+fn hostOutputInfo(userdata: ?*anyopaque, info: *wayembed.c_api.WayembedOutputInfo) callconv(.c) bool {
     const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return false));
     if (!state.output_seen) return false;
     info.mode_width = state.output_mode_width;
     info.mode_height = state.output_mode_height;
     info.scale = state.output_scale;
-    info.make = "wayplug";
+    info.make = "wayembed";
     info.model = "smoke-output";
-    info.name = "wayplug-smoke-0";
-    info.description = "wayplug smoke output";
+    info.name = "wayembed-smoke-0";
+    info.description = "wayembed smoke output";
     return true;
 }
 
@@ -356,7 +356,7 @@ fn hostSubsurfaceOffset(
     _: ?*anyopaque,
     x: *i32,
     y: *i32,
-    _: *wayplug.wayland.client.wl_display,
+    _: *wayembed.wayland.client.wl_display,
     _: *wlp.wl_surface,
     _: *wlp.wl_surface,
 ) callconv(.c) bool {
@@ -367,11 +367,11 @@ fn hostSubsurfaceOffset(
 
 fn hostSurfaceCreated(
     userdata: ?*anyopaque,
-    client: ?*wayplug.c_api.wayplug_client,
+    client: ?*wayembed.c_api.wayembed_client,
     child_surface: ?*wlp.wl_surface,
 ) callconv(.c) void {
     const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return));
-    const handle: *wayplug.server.ClientHandle = @ptrCast(@alignCast(client orelse return));
+    const handle: *wayembed.server.ClientHandle = @ptrCast(@alignCast(client orelse return));
     const parent = state.parent_surface orelse return;
     const child = child_surface orelse return;
     const attached = handle.server.embedAttach(handle, parent, child);
@@ -402,7 +402,7 @@ fn hostEmbedDestroyed(userdata: ?*anyopaque, embed_id: u32) callconv(.c) void {
     _ = state.embed_destroyed_count.fetchAdd(1, .acq_rel);
 }
 
-fn hostClientClosed(userdata: ?*anyopaque, client: ?*wayplug.c_api.wayplug_client) callconv(.c) void {
+fn hostClientClosed(userdata: ?*anyopaque, client: ?*wayembed.c_api.wayembed_client) callconv(.c) void {
     if (client == null) return;
     const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return));
     _ = state.client_closed_count.fetchAdd(1, .acq_rel);
@@ -416,11 +416,11 @@ test "weston headless smoke forwards create attach commit and embed" {
     if (!smokeSelected(filter, .weston)) return error.SkipZigTest;
 
     const nonce = c.getpid();
-    const socket_name = try std.fmt.allocPrintSentinel(allocator, "wayplug-smoke-{d}", .{nonce}, 0);
+    const socket_name = try std.fmt.allocPrintSentinel(allocator, "wayembed-smoke-{d}", .{nonce}, 0);
     defer allocator.free(socket_name);
     const socket_arg = try std.fmt.allocPrint(allocator, "--socket={s}", .{socket_name});
     defer allocator.free(socket_arg);
-    const log_path = try std.fmt.allocPrintSentinel(allocator, "/tmp/wayplug-smoke-weston-{d}/weston.log", .{nonce}, 0);
+    const log_path = try std.fmt.allocPrintSentinel(allocator, "/tmp/wayembed-smoke-weston-{d}/weston.log", .{nonce}, 0);
     defer allocator.free(log_path);
     const log_arg = try std.fmt.allocPrint(allocator, "--log={s}", .{log_path});
     defer allocator.free(log_arg);
@@ -453,7 +453,7 @@ test "river headless smoke forwards create attach commit and embed" {
     const filter = smokeFilter();
     if (!smokeSelected(filter, .river)) return error.SkipZigTest;
 
-    const river_bin = getenvSlice("WAYPLUG_RIVER_BIN") orelse "river";
+    const river_bin = getenvSlice("WAYEMBED_RIVER_BIN") orelse "river";
     const river_argv = [_][]const u8{
         river_bin,
         "-no-xwayland",
@@ -484,11 +484,11 @@ test "mutter headless smoke forwards create attach commit and embed" {
     if (!smokeSelected(filter, .mutter)) return error.SkipZigTest;
 
     const nonce = c.getpid();
-    const socket_name = try std.fmt.allocPrintSentinel(allocator, "wayplug-mutter-smoke-{d}", .{nonce}, 0);
+    const socket_name = try std.fmt.allocPrintSentinel(allocator, "wayembed-mutter-smoke-{d}", .{nonce}, 0);
     defer allocator.free(socket_name);
     const display_arg = try std.fmt.allocPrint(allocator, "--wayland-display={s}", .{socket_name});
     defer allocator.free(display_arg);
-    const mutter_bin = getenvSlice("WAYPLUG_MUTTER_BIN") orelse "mutter";
+    const mutter_bin = getenvSlice("WAYEMBED_MUTTER_BIN") orelse "mutter";
     const mutter_argv = [_][]const u8{
         "dbus-run-session",
         "--",
@@ -515,7 +515,7 @@ test "niri smoke forwards create attach commit and embed" {
     const filter = smokeFilter();
     if (!smokeSelected(filter, .niri)) return error.SkipZigTest;
 
-    const niri_bin = getenvSlice("WAYPLUG_NIRI_BIN") orelse "niri";
+    const niri_bin = getenvSlice("WAYEMBED_NIRI_BIN") orelse "niri";
     var niri_env: [1]EnvPair = undefined;
     var extra_env: []const EnvPair = &.{};
     if (getenvSlice("DISPLAY")) |display| {
@@ -542,9 +542,9 @@ test "kwin virtual smoke forwards create attach commit and embed" {
     if (!smokeSelected(filter, .kwin)) return error.SkipZigTest;
 
     const nonce = c.getpid();
-    const socket_name = try std.fmt.allocPrintSentinel(allocator, "wayplug-kwin-smoke-{d}", .{nonce}, 0);
+    const socket_name = try std.fmt.allocPrintSentinel(allocator, "wayembed-kwin-smoke-{d}", .{nonce}, 0);
     defer allocator.free(socket_name);
-    const kwin_bin = getenvSlice("WAYPLUG_KWIN_BIN") orelse "kwin_wayland";
+    const kwin_bin = getenvSlice("WAYEMBED_KWIN_BIN") orelse "kwin_wayland";
     const kwin_argv = [_][]const u8{
         "dbus-run-session",
         "--",
@@ -575,7 +575,7 @@ fn runCompositorSmoke(spec: CompositorSmokeSpec) !void {
     const nonce = c.getpid();
     const runtime_dir = try std.fmt.allocPrintSentinel(
         allocator,
-        "/tmp/wayplug-smoke-{s}-{d}",
+        "/tmp/wayembed-smoke-{s}-{d}",
         .{ spec.name, nonce },
         0,
     );
@@ -665,9 +665,9 @@ fn runCompositorSmoke(spec: CompositorSmokeSpec) !void {
         .xdg_wm_base = host_registry_state.xdg_wm_base,
         .parent_surface = parent_surface,
     };
-    const iface = wayplug.c_api.WayplugHostInterface{
-        .size = @sizeOf(wayplug.c_api.WayplugHostInterface),
-        .version = wayplug.c_api.abi_version,
+    const iface = wayembed.c_api.WayembedHostInterface{
+        .size = @sizeOf(wayembed.c_api.WayembedHostInterface),
+        .version = wayembed.c_api.abi_version,
         .userdata = &host_state,
         .get_compositor = hostCompositor,
         .get_subcompositor = hostSubcompositor,
@@ -687,7 +687,7 @@ fn runCompositorSmoke(spec: CompositorSmokeSpec) !void {
         .on_embed_resized = hostEmbedResized,
         .on_embed_destroyed = hostEmbedDestroyed,
     };
-    const server = try wayplug.server.Server.create(allocator, &iface, null);
+    const server = try wayembed.server.Server.create(allocator, &iface, null);
     defer server.destroy();
 
     const plugin_display = server.openClientDisplay() orelse return error.PluginDisplayOpenFailed;
@@ -790,7 +790,7 @@ fn flushDisplay(display: *wlc.struct_wl_display) !void {
 }
 
 fn smokeFilter() SmokeFilter {
-    const raw = getenvSlice("WAYPLUG_SMOKE_COMPOSITOR") orelse return .available;
+    const raw = getenvSlice("WAYEMBED_SMOKE_COMPOSITOR") orelse return .available;
     if (std.mem.eql(u8, raw, "weston")) return .weston;
     if (std.mem.eql(u8, raw, "river")) return .river;
     if (std.mem.eql(u8, raw, "mutter")) return .mutter;
@@ -906,7 +906,7 @@ fn createPluginBuffer(shm: *wlp.wl_shm) !*wlp.wl_buffer {
     const height = 16;
     const stride = width * 4;
     const size = stride * height;
-    const fd = try std.posix.memfd_create("wayplug-smoke-buffer", 0);
+    const fd = try std.posix.memfd_create("wayembed-smoke-buffer", 0);
     defer _ = c.close(fd);
     if (c.ftruncate(fd, size) != 0) return error.TruncateBufferFailed;
     var pixels: [size]u8 = undefined;

@@ -1,6 +1,6 @@
 //! Root module. Aggregates submodules so the static library has a
 //! single `root_source_file` and integration tests under `tests/` can
-//! `@import("wayplug")` to reach the layers.
+//! `@import("wayembed")` to reach the layers.
 
 const std = @import("std");
 

@@ -1,4 +1,4 @@
-//! Passive records, ids, enums, and flags for the wayplug model.
+//! Passive records, ids, enums, and flags for the wayembed model.
 //!
 //! No methods, no protocol behavior, no cross-table mutation. Per
 //! docs/dod.md § Core Rule. New record types added here are picked up

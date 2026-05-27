@@ -1,7 +1,7 @@
 # AGENTS.md - guide for AI coding agents
 
 This file documents project conventions, build mechanics, and architecture
-rules for agents working on `wayplug`. Humans should read `README.md` first;
+rules for agents working on `wayembed`. Humans should read `README.md` first;
 this file adds the operational details an agent needs to act safely.
 
 ## Working Rules
@@ -20,7 +20,7 @@ this file adds the operational details an agent needs to act safely.
    the user explicitly asks not to run tests.
 7. Do not run Zig builds or tests in parallel. They share `.zig-cache` and
    `zig-out`; concurrent invocations can produce confusing or stale results.
-8. Keep the public ABI stable. Changes to `include/wayplug.h` must preserve C
+8. Keep the public ABI stable. Changes to `include/wayembed.h` must preserve C
    ABI compatibility unless the ABI version is intentionally changed.
 9. Keep source files small and focused. If a file grows too broad, split it by
    domain according to `docs/architecture.md`.
@@ -64,9 +64,9 @@ The public boundary is C.
 2. Public handles must be opaque.
 3. Public functions must use C-callable types only.
 4. Do not expose Zig structs, slices, allocators, error unions, optionals, or
-   comptime concepts in `include/wayplug.h`.
+   comptime concepts in `include/wayembed.h`.
 5. Returned ownership must be explicit in the header.
-6. If `include/wayplug.h` changes, update docs and C ABI smoke coverage.
+6. If `include/wayembed.h` changes, update docs and C ABI smoke coverage.
 
 ## Verification
 

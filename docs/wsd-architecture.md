@@ -1,12 +1,12 @@
 # wayland-server-delegate Architecture
 
 > *Reference document. Describes the C++ `wayland-server-delegate` prior
-> art for context. Not a contract for wayplug; see
+> art for context. Not a contract for wayembed; see
 > [architecture.md](architecture.md) and [roadmap.md](roadmap.md) for
-> what wayplug itself does.*
+> what wayembed itself does.*
 
 This note describes the architecture of `wayland-server-delegate` as prior art
-for `wayplug`.
+for `wayembed`.
 
 `wayland-server-delegate` is not a general nested compositor. It is a selective
 Wayland protocol delegator. The host application connects to the real session
@@ -367,7 +367,7 @@ editors. It is not the primitive that embeds a plugin editor into a host panel.
   data device, decorations, activation, viewporter, keyboard shortcuts inhibit,
   tablet, and text input.
 
-## Lessons For Wayplug
+## Lessons For Wayembed
 
 The architecture worth carrying forward:
 
@@ -379,7 +379,7 @@ The architecture worth carrying forward:
 - event forwarding from upstream listeners to plugin resources
 - host callback for geometry/input-coordinate translation
 
-The parts `wayplug` should change:
+The parts `wayembed` should change:
 
 - expose a stable C ABI instead of a C++ ABI
 - use opaque handles and versioned structs

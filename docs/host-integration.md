@@ -1,11 +1,11 @@
 # Host Integration Walkthrough
 
-This document walks a host application through every wayplug call it needs
+This document walks a host application through every wayembed call it needs
 to embed a Wayland-native plugin editor. The host in the examples is
 Carla-shaped: a Qt-based audio plugin host with its own Wayland connection
 and an editor area inside a host window.
 
-The public ABI in [../include/wayplug.h](../include/wayplug.h) is the source
+The public ABI in [../include/wayembed.h](../include/wayembed.h) is the source
 of truth. This walkthrough is the validation harness for that ABI: anything
 awkward to write below is an ABI mistake that should be fixed before code
 lands.
@@ -13,14 +13,14 @@ lands.
 ## Shape of a Session
 
 ```text
-host                                wayplug                       plugin
-  | wayplug_server_create()           |                              |
+host                                wayembed                       plugin
+  | wayembed_server_create()           |                              |
   |---------------------------------->|                              |
-  | wayplug_server_get_fd()           |                              |
+  | wayembed_server_get_fd()           |                              |
   |---------------------------------->|                              |
   | adds fd to host event loop        |                              |
   |                                   |                              |
-  | wayplug_server_open_client_display|                              |
+  | wayembed_server_open_client_display|                              |
   |---------------------------------->|                              |
   |          wl_display * (plugin side)                              |
   |<----------------------------------|                              |
@@ -35,7 +35,7 @@ host                                wayplug                       plugin
   |<----------------------------------|                              |
   | parents subsurface in editor area |                              |
   |                                   |                              |
-  | wayplug_embed_resize(...)         |                              |
+  | wayembed_embed_resize(...)         |                              |
   |---------------------------------->|                              |
   |                                   |     wl_subsurface.set_pos    |
   |                                   |----------------------------->|
@@ -46,18 +46,18 @@ host                                wayplug                       plugin
   |<----------------------------------|                              |
   | clears editor area                |                              |
   |                                   |                              |
-  | wayplug_server_destroy()          |                              |
+  | wayembed_server_destroy()          |                              |
   |---------------------------------->|                              |
 ```
 
 ## Setting Up the Host Interface
 
 The host provides upstream globals (compositor, shm, seat) and lifecycle
-callbacks through a single `wayplug_host_interface` struct. Null function
+callbacks through a single `wayembed_host_interface` struct. Null function
 pointers disable optional globals or notifications.
 
 ```c
-#include <wayplug.h>
+#include <wayembed.h>
 
 struct carla_host {
     struct wl_display *upstream_display;
@@ -104,12 +104,12 @@ static const char *get_seat_name(void *u) {
     return "carla-seat";
 }
 
-static bool get_output_info(void *u, wayplug_output_info *info) {
+static bool get_output_info(void *u, wayembed_output_info *info) {
     (void)u;
     info->mode_width = 1920;
     info->mode_height = 1080;
     info->scale = 1;
-    info->name = "wayplug-host-output";
+    info->name = "wayembed-host-output";
     return true;
 }
 
@@ -124,26 +124,26 @@ static bool get_subsurface_offset(void *u, int32_t *x, int32_t *y,
     return true;
 }
 
-static void on_client_connected(void *u, wayplug_client *client) {
+static void on_client_connected(void *u, wayembed_client *client) {
     (void)u; (void)client;
     /* Optional logging. */
 }
 
-static void on_protocol_error(void *u, wayplug_client *client, uint32_t code) {
+static void on_protocol_error(void *u, wayembed_client *client, uint32_t code) {
     (void)u; (void)client; (void)code;
     /* Optional diagnostics. */
 }
 
-static void on_surface_created(void *u, wayplug_client *client,
+static void on_surface_created(void *u, wayembed_client *client,
                                struct wl_surface *plugin_child_surface) {
     struct carla_host *h = u;
     /* Wrap the child surface as a subsurface of the editor parent. */
-    wayplug_embed_attach(client,
+    wayembed_embed_attach(client,
                          h->editor_parent_surface,
                          plugin_child_surface);
 }
 
-static void on_client_closed(void *u, wayplug_client *client) {
+static void on_client_closed(void *u, wayembed_client *client) {
     (void)client;
     struct carla_host *h = u;
     carla_clear_editor_area(h);
@@ -171,9 +171,9 @@ The struct definition Carla fills in:
 ```c
 static struct carla_host host_state = { /* initialized at startup */ };
 
-static const wayplug_host_interface host_iface = {
-    .size = sizeof(wayplug_host_interface),
-    .version = WAYPLUG_ABI_VERSION,
+static const wayembed_host_interface host_iface = {
+    .size = sizeof(wayembed_host_interface),
+    .version = WAYEMBED_ABI_VERSION,
     .userdata = &host_state,
 
     .get_compositor = get_compositor,
@@ -201,25 +201,25 @@ static const wayplug_host_interface host_iface = {
 ## Creating the Server
 
 ```c
-wayplug_server *server = wayplug_server_create(&host_iface, /* queue */ NULL);
+wayembed_server *server = wayembed_server_create(&host_iface, /* queue */ NULL);
 if (!server) {
-    fprintf(stderr, "wayplug_server_create failed\n");
+    fprintf(stderr, "wayembed_server_create failed\n");
     return -1;
 }
 ```
 
 The server takes a const pointer to the host interface and copies what it
-needs. The host owns the struct; wayplug must not retain function pointers
+needs. The host owns the struct; wayembed must not retain function pointers
 across a destroy. The `queue` argument is the upstream `wl_event_queue` the
 server should drive — `NULL` means the default queue.
 
 ## Event Loop Integration
 
-wayplug never spawns threads or owns a poll loop. The host adds the
+wayembed never spawns threads or owns a poll loop. The host adds the
 server's fd to its existing event loop.
 
 ```c
-int server_fd = wayplug_server_get_fd(server);
+int server_fd = wayembed_server_get_fd(server);
 
 struct pollfd pfds[2] = {
     { .fd = upstream_fd,  .events = POLLIN },
@@ -227,7 +227,7 @@ struct pollfd pfds[2] = {
 };
 
 while (running) {
-    wayplug_server_flush(server);
+    wayembed_server_flush(server);
     wl_display_flush(host_state.upstream_display);
 
     if (poll(pfds, 2, -1) < 0) break;
@@ -235,14 +235,14 @@ while (running) {
     if (pfds[0].revents & POLLIN)
         wl_display_dispatch(host_state.upstream_display);
     if (pfds[1].revents & POLLIN)
-        wayplug_server_dispatch(server);
+        wayembed_server_dispatch(server);
 }
 ```
 
-`wayplug_server_dispatch` fires lifecycle callbacks synchronously before
+`wayembed_server_dispatch` fires lifecycle callbacks synchronously before
 it returns. Inside a callback the host may issue calls on its *upstream*
 connection. The one supported same-server call is
-`wayplug_embed_attach` from `on_surface_created`, which creates the
+`wayembed_embed_attach` from `on_surface_created`, which creates the
 embedded editor session for that plugin client. Other same-server calls
 from lifecycle callbacks are undefined.
 
@@ -253,7 +253,7 @@ or an LV2 Wayland UI:
 
 ```c
 struct wl_display *plugin_display =
-    wayplug_server_open_client_display(server);
+    wayembed_server_open_client_display(server);
 
 if (!plugin_display) {
     return CLAP_WINDOW_API_FAILED;
@@ -274,35 +274,35 @@ attach buffers, commit.
 
 ## Receiving the Plugin's Surface
 
-When the plugin calls `wl_compositor.create_surface()`, wayplug forwards
+When the plugin calls `wl_compositor.create_surface()`, wayembed forwards
 the request, registers the new surface in its model, and invokes
 `on_surface_created` on the host. The host parents the child surface as a
 subsurface of its editor area:
 
 ```c
-static void on_surface_created(void *u, wayplug_client *client,
+static void on_surface_created(void *u, wayembed_client *client,
                                struct wl_surface *plugin_child_surface) {
     struct carla_host *h = u;
-    wayplug_embed_attach(client,
+    wayembed_embed_attach(client,
                          h->editor_parent_surface,
                          plugin_child_surface);
 }
 ```
 
-`wayplug_embed_attach` creates a `wl_subsurface`, positions it at the
+`wayembed_embed_attach` creates a `wl_subsurface`, positions it at the
 offset returned by `get_subsurface_offset`, and tracks it in the model. The
-host does not see `wl_subcompositor` directly — wayplug owns that wiring.
+host does not see `wl_subcompositor` directly — wayembed owns that wiring.
 One client can have one active embedded editor session. If attach returns
 `false`, no session was established and the host should not call
-`wayplug_embed_resize` for that client until another surface is created and
+`wayembed_embed_resize` for that client until another surface is created and
 attached.
 
 ## Resize Round-Trip
 
 When the user resizes Carla's window, Carla updates its editor dimensions
-and notifies wayplug. wayplug stores the new size in the embed record and
+and notifies wayembed. wayembed stores the new size in the embed record and
 sends the relevant subsurface positioning calls upstream. Width and height
-must be non-negative; zero is accepted. `wayplug_embed_resize` returns
+must be non-negative; zero is accepted. `wayembed_embed_resize` returns
 `false` if the client is closing or has no active embedded session.
 
 If the plugin needs a size hint, a plugin-format adapter can layer that on
@@ -314,18 +314,18 @@ void carla_on_window_resize(int new_width, int new_height) {
     host_state.editor_width = new_width;
     host_state.editor_height = new_height;
 
-    wayplug_embed_resize(plugin_client, new_width, new_height);
+    wayembed_embed_resize(plugin_client, new_width, new_height);
 }
 ```
 
 ## Plugin Disconnect
 
 When the plugin's UI thread exits or the plugin closes its display,
-wayplug:
+wayembed:
 
 1. Walks the client's owned objects in teardown order (see
    [Architecture § Teardown Order](architecture.md#teardown-order)).
-2. Releases wayplug-owned embed wiring, including the internal
+2. Releases wayembed-owned embed wiring, including the internal
    `wl_subsurface` proxy.
 3. Fires `on_embed_destroyed` for active embedded sessions.
 4. Fires `on_client_closed` after embed teardown completes.
@@ -336,17 +336,17 @@ The host clears its editor area and is ready to host the next plugin.
 ## Shutdown
 
 ```c
-wayplug_server_destroy(server);
+wayembed_server_destroy(server);
 ```
 
 Destroy invalidates every handle the server issued, including
-`plugin_display` values and any `wayplug_client *` the host retained. The
-host must not call wayplug functions after destroy returns.
+`plugin_display` values and any `wayembed_client *` the host retained. The
+host must not call wayembed functions after destroy returns.
 
 ## Embedded Session Contract
 
-The public ABI stays client-scoped. Internally, wayplug treats a successful
-`wayplug_embed_attach` as the start of one embedded editor session for that
-client. `wayplug_embed_resize` targets that active session, and client
+The public ABI stays client-scoped. Internally, wayembed treats a successful
+`wayembed_embed_attach` as the start of one embedded editor session for that
+client. `wayembed_embed_resize` targets that active session, and client
 disconnect or server destroy ends it. A future plugin-format adapter may wrap
 this in a higher-level handle if real host integrations need one.

@@ -1,5 +1,5 @@
 //! wl_registry bind dispatch. Advertises only the globals the host
-//! supplies through `wayplug_host_interface`.
+//! supplies through `wayembed_host_interface`.
 
 const std = @import("std");
 const compositor_protocol = @import("compositor.zig");

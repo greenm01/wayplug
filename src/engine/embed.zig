@@ -2,7 +2,7 @@
 //!
 //! This is the heart of the embedded-plugin-editor use case. Per
 //! docs/host-integration.md, host code reaches the engine via
-//! `wayplug_embed_attach` and `wayplug_embed_resize` on the C ABI.
+//! `wayembed_embed_attach` and `wayembed_embed_resize` on the C ABI.
 
 const std = @import("std");
 const types = @import("../data/types.zig");

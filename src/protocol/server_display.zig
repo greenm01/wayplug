@@ -1,5 +1,5 @@
 //! Local wl_display server stub. Hosts the per-client connection
-//! endpoints created by `wayplug_server_open_client_display`.
+//! endpoints created by `wayembed_server_open_client_display`.
 
 const std = @import("std");
 

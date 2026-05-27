@@ -1,4 +1,4 @@
-//! C ABI surface. The only module that exports `wayplug_*` symbols.
+//! C ABI surface. The only module that exports `wayembed_*` symbols.
 //!
 //! Defines every extern struct and validates ABI arguments before
 //! delegating to `server.zig`. Internal modules should not import
@@ -15,20 +15,20 @@ pub const adapter_abi_version: u32 = 1;
 pub const adapter_format_unknown: u32 = 0;
 pub const adapter_format_clap: u32 = 1;
 pub const adapter_format_lv2: u32 = 2;
-const adapter_clap_token = "wayplug.experimental.clap.wayland";
-const adapter_lv2_token = "https://wayplug.org/ns/ext/wayland-ui";
+const adapter_clap_token = "wayembed.experimental.clap.wayland";
+const adapter_lv2_token = "https://wayembed.org/ns/ext/wayland-ui";
 
 /// Opaque to C callers; really `server_mod.Server` on the Zig side.
-pub const wayplug_server = opaque {};
+pub const wayembed_server = opaque {};
 
 /// Opaque per-client handle the host receives via lifecycle callbacks
-/// and passes back into `wayplug_embed_*` operations.
-pub const wayplug_client = opaque {};
+/// and passes back into `wayembed_embed_*` operations.
+pub const wayembed_client = opaque {};
 
 /// Opaque caller-owned snapshot handle.
-pub const wayplug_snapshot = opaque {};
+pub const wayembed_snapshot = opaque {};
 
-pub const WayplugSnapshotCounts = extern struct {
+pub const WayembedSnapshotCounts = extern struct {
     size: u32,
     version: u32,
     clients: usize,
@@ -39,7 +39,7 @@ pub const WayplugSnapshotCounts = extern struct {
     outputs: usize,
 };
 
-pub const WayplugOutputInfo = extern struct {
+pub const WayembedOutputInfo = extern struct {
     size: u32,
     version: u32,
     x: i32,
@@ -59,7 +59,7 @@ pub const WayplugOutputInfo = extern struct {
     description: ?[*:0]const u8,
 };
 
-pub const WayplugAdapterHandoff = extern struct {
+pub const WayembedAdapterHandoff = extern struct {
     size: u32,
     version: u32,
     format: u32,
@@ -69,7 +69,7 @@ pub const WayplugAdapterHandoff = extern struct {
     format_userdata: ?*anyopaque,
 };
 
-pub const WayplugAdapterResize = extern struct {
+pub const WayembedAdapterResize = extern struct {
     size: u32,
     version: u32,
     width: i32,
@@ -88,7 +88,7 @@ const SnapshotHandle = struct {
     }
 };
 
-pub const WayplugHostInterface = extern struct {
+pub const WayembedHostInterface = extern struct {
     size: u32,
     version: u32,
     userdata: ?*anyopaque,
@@ -109,28 +109,28 @@ pub const WayplugHostInterface = extern struct {
         *wlp.wl_surface,
     ) callconv(.c) bool,
 
-    on_client_connected: ?*const fn (?*anyopaque, ?*wayplug_client) callconv(.c) void,
-    on_surface_created: ?*const fn (?*anyopaque, ?*wayplug_client, ?*wlp.wl_surface) callconv(.c) void,
-    on_client_closed: ?*const fn (?*anyopaque, ?*wayplug_client) callconv(.c) void,
-    on_protocol_error: ?*const fn (?*anyopaque, ?*wayplug_client, u32) callconv(.c) void,
+    on_client_connected: ?*const fn (?*anyopaque, ?*wayembed_client) callconv(.c) void,
+    on_surface_created: ?*const fn (?*anyopaque, ?*wayembed_client, ?*wlp.wl_surface) callconv(.c) void,
+    on_client_closed: ?*const fn (?*anyopaque, ?*wayembed_client) callconv(.c) void,
+    on_protocol_error: ?*const fn (?*anyopaque, ?*wayembed_client, u32) callconv(.c) void,
     on_embed_mapped: ?*const fn (?*anyopaque, u32) callconv(.c) void,
     on_embed_resized: ?*const fn (?*anyopaque, u32, i32, i32) callconv(.c) void,
     on_embed_destroyed: ?*const fn (?*anyopaque, u32) callconv(.c) void,
 
     get_seat_capabilities: ?*const fn (?*anyopaque) callconv(.c) u32,
     get_seat_name: ?*const fn (?*anyopaque) callconv(.c) ?[*:0]const u8,
-    get_output_info: ?*const fn (?*anyopaque, *WayplugOutputInfo) callconv(.c) bool,
+    get_output_info: ?*const fn (?*anyopaque, *WayembedOutputInfo) callconv(.c) bool,
 };
 
-const minimum_host_interface_size = @offsetOf(WayplugHostInterface, "userdata") +
+const minimum_host_interface_size = @offsetOf(WayembedHostInterface, "userdata") +
     @sizeOf(?*anyopaque);
 
-pub fn normalizeHostInterface(host: *const WayplugHostInterface) ?WayplugHostInterface {
+pub fn normalizeHostInterface(host: *const WayembedHostInterface) ?WayembedHostInterface {
     if (host.size < minimum_host_interface_size) return null;
     if (host.version != abi_version) return null;
 
     var normalized = emptyHostInterface();
-    normalized.size = @sizeOf(WayplugHostInterface);
+    normalized.size = @sizeOf(WayembedHostInterface);
     normalized.version = abi_version;
     copyHostField(&normalized, host, "userdata");
     copyHostField(&normalized, host, "get_compositor");
@@ -153,9 +153,9 @@ pub fn normalizeHostInterface(host: *const WayplugHostInterface) ?WayplugHostInt
     return normalized;
 }
 
-fn emptyHostInterface() WayplugHostInterface {
+fn emptyHostInterface() WayembedHostInterface {
     return .{
-        .size = @sizeOf(WayplugHostInterface),
+        .size = @sizeOf(WayembedHostInterface),
         .version = abi_version,
         .userdata = null,
         .get_compositor = null,
@@ -179,12 +179,12 @@ fn emptyHostInterface() WayplugHostInterface {
 }
 
 fn copyHostField(
-    normalized: *WayplugHostInterface,
-    host: *const WayplugHostInterface,
+    normalized: *WayembedHostInterface,
+    host: *const WayembedHostInterface,
     comptime field_name: []const u8,
 ) void {
     const Field = @TypeOf(@field(normalized, field_name));
-    const end = @offsetOf(WayplugHostInterface, field_name) + @sizeOf(Field);
+    const end = @offsetOf(WayembedHostInterface, field_name) + @sizeOf(Field);
     if (host.size >= end) {
         @field(normalized, field_name) = @field(host.*, field_name);
     }
@@ -192,26 +192,26 @@ fn copyHostField(
 
 // ===== Exports =====
 
-export fn wayplug_abi_version() callconv(.c) u32 {
+export fn wayembed_abi_version() callconv(.c) u32 {
     return abi_version;
 }
 
-export fn wayplug_adapter_abi_version() callconv(.c) u32 {
+export fn wayembed_adapter_abi_version() callconv(.c) u32 {
     return adapter_abi_version;
 }
 
-export fn wayplug_adapter_handoff_init(
-    handoff: ?*WayplugAdapterHandoff,
+export fn wayembed_adapter_handoff_init(
+    handoff: ?*WayembedAdapterHandoff,
     format: u32,
     server: ?*server_mod.Server,
     display: ?*wlc.wl_display,
 ) callconv(.c) bool {
     const out = handoff orelse return false;
-    if (out.size < @sizeOf(WayplugAdapterHandoff)) return false;
+    if (out.size < @sizeOf(WayembedAdapterHandoff)) return false;
     if (server == null or display == null) return false;
     const token = adapterToken(format) orelse return false;
     out.* = .{
-        .size = @sizeOf(WayplugAdapterHandoff),
+        .size = @sizeOf(WayembedAdapterHandoff),
         .version = adapter_abi_version,
         .format = format,
         .server = server,
@@ -222,29 +222,29 @@ export fn wayplug_adapter_handoff_init(
     return true;
 }
 
-export fn wayplug_adapter_handoff_validate(
-    handoff: ?*const WayplugAdapterHandoff,
+export fn wayembed_adapter_handoff_validate(
+    handoff: ?*const WayembedAdapterHandoff,
 ) callconv(.c) bool {
     const h = handoff orelse return false;
-    if (h.size < @sizeOf(WayplugAdapterHandoff)) return false;
+    if (h.size < @sizeOf(WayembedAdapterHandoff)) return false;
     if (h.version != adapter_abi_version) return false;
     if (h.server == null or h.display == null) return false;
     if (adapterToken(h.format) == null) return false;
     return h.format_token != null;
 }
 
-export fn wayplug_adapter_resize_validate(
-    resize: ?*const WayplugAdapterResize,
+export fn wayembed_adapter_resize_validate(
+    resize: ?*const WayembedAdapterResize,
 ) callconv(.c) bool {
     const r = resize orelse return false;
-    if (r.size < @sizeOf(WayplugAdapterResize)) return false;
+    if (r.size < @sizeOf(WayembedAdapterResize)) return false;
     if (r.version != adapter_abi_version) return false;
     if (r.width < 0 or r.height < 0) return false;
     return r.scale > 0;
 }
 
-export fn wayplug_server_create(
-    host: ?*const WayplugHostInterface,
+export fn wayembed_server_create(
+    host: ?*const WayembedHostInterface,
     queue: ?*wlc.wl_event_queue,
 ) callconv(.c) ?*server_mod.Server {
     const iface = host orelse return null;
@@ -252,27 +252,27 @@ export fn wayplug_server_create(
     return server_mod.Server.create(std.heap.c_allocator, &normalized, queue) catch null;
 }
 
-export fn wayplug_server_destroy(server: ?*server_mod.Server) callconv(.c) void {
+export fn wayembed_server_destroy(server: ?*server_mod.Server) callconv(.c) void {
     const s = server orelse return;
     s.destroy();
 }
 
-export fn wayplug_server_get_fd(server: ?*server_mod.Server) callconv(.c) c_int {
+export fn wayembed_server_get_fd(server: ?*server_mod.Server) callconv(.c) c_int {
     const s = server orelse return -1;
     return s.getFd();
 }
 
-export fn wayplug_server_dispatch(server: ?*server_mod.Server) callconv(.c) void {
+export fn wayembed_server_dispatch(server: ?*server_mod.Server) callconv(.c) void {
     const s = server orelse return;
     s.dispatch();
 }
 
-export fn wayplug_server_flush(server: ?*server_mod.Server) callconv(.c) void {
+export fn wayembed_server_flush(server: ?*server_mod.Server) callconv(.c) void {
     const s = server orelse return;
     s.flush();
 }
 
-export fn wayplug_server_snapshot(server: ?*server_mod.Server) callconv(.c) ?*wayplug_snapshot {
+export fn wayembed_server_snapshot(server: ?*server_mod.Server) callconv(.c) ?*wayembed_snapshot {
     const s = server orelse return null;
     const allocator = s.allocator;
     const handle = allocator.create(SnapshotHandle) catch return null;
@@ -287,17 +287,17 @@ export fn wayplug_server_snapshot(server: ?*server_mod.Server) callconv(.c) ?*wa
     return @ptrCast(handle);
 }
 
-export fn wayplug_snapshot_get_counts(
-    snapshot: ?*const wayplug_snapshot,
-    counts: ?*WayplugSnapshotCounts,
+export fn wayembed_snapshot_get_counts(
+    snapshot: ?*const wayembed_snapshot,
+    counts: ?*WayembedSnapshotCounts,
 ) callconv(.c) bool {
     const handle = snapshotHandleConst(snapshot) orelse return false;
     const out = counts orelse return false;
-    if (out.size < @sizeOf(WayplugSnapshotCounts)) return false;
+    if (out.size < @sizeOf(WayembedSnapshotCounts)) return false;
     if (out.version != abi_version) return false;
 
     out.* = .{
-        .size = @sizeOf(WayplugSnapshotCounts),
+        .size = @sizeOf(WayembedSnapshotCounts),
         .version = abi_version,
         .clients = handle.snapshot.counts.clients,
         .resources = handle.snapshot.counts.resources,
@@ -309,19 +309,19 @@ export fn wayplug_snapshot_get_counts(
     return true;
 }
 
-export fn wayplug_snapshot_free(snapshot: ?*wayplug_snapshot) callconv(.c) void {
+export fn wayembed_snapshot_free(snapshot: ?*wayembed_snapshot) callconv(.c) void {
     const handle = snapshotHandle(snapshot) orelse return;
     handle.destroy();
 }
 
-export fn wayplug_server_open_client_display(
+export fn wayembed_server_open_client_display(
     server: ?*server_mod.Server,
 ) callconv(.c) ?*wlc.wl_display {
     const s = server orelse return null;
     return s.openClientDisplay();
 }
 
-export fn wayplug_server_close_client_display(
+export fn wayembed_server_close_client_display(
     server: ?*server_mod.Server,
     display: ?*wlc.wl_display,
 ) callconv(.c) bool {
@@ -330,7 +330,7 @@ export fn wayplug_server_close_client_display(
     return s.closeClientDisplay(d);
 }
 
-export fn wayplug_server_create_proxy(
+export fn wayembed_server_create_proxy(
     server: ?*server_mod.Server,
     client_display: ?*wlc.wl_display,
     host_object: ?*wlc.wl_proxy,
@@ -341,7 +341,7 @@ export fn wayplug_server_create_proxy(
     return null;
 }
 
-export fn wayplug_server_destroy_proxy(
+export fn wayembed_server_destroy_proxy(
     server: ?*server_mod.Server,
     proxy: ?*wlc.wl_proxy,
 ) callconv(.c) void {
@@ -349,8 +349,8 @@ export fn wayplug_server_destroy_proxy(
     _ = proxy;
 }
 
-export fn wayplug_embed_attach(
-    client: ?*wayplug_client,
+export fn wayembed_embed_attach(
+    client: ?*wayembed_client,
     parent_surface: ?*wlp.wl_surface,
     child_surface: ?*wlp.wl_surface,
 ) callconv(.c) bool {
@@ -360,8 +360,8 @@ export fn wayplug_embed_attach(
     return c.server.embedAttach(c, parent, child);
 }
 
-export fn wayplug_embed_resize(
-    client: ?*wayplug_client,
+export fn wayembed_embed_resize(
+    client: ?*wayembed_client,
     width: i32,
     height: i32,
 ) callconv(.c) bool {
@@ -369,17 +369,17 @@ export fn wayplug_embed_resize(
     return c.server.embedResize(c, width, height);
 }
 
-fn clientHandle(client: ?*wayplug_client) ?*server_mod.ClientHandle {
+fn clientHandle(client: ?*wayembed_client) ?*server_mod.ClientHandle {
     const c = client orelse return null;
     return @ptrCast(@alignCast(c));
 }
 
-fn snapshotHandle(snapshot: ?*wayplug_snapshot) ?*SnapshotHandle {
+fn snapshotHandle(snapshot: ?*wayembed_snapshot) ?*SnapshotHandle {
     const s = snapshot orelse return null;
     return @ptrCast(@alignCast(s));
 }
 
-fn snapshotHandleConst(snapshot: ?*const wayplug_snapshot) ?*const SnapshotHandle {
+fn snapshotHandleConst(snapshot: ?*const wayembed_snapshot) ?*const SnapshotHandle {
     const s = snapshot orelse return null;
     return @ptrCast(@alignCast(s));
 }
@@ -395,22 +395,22 @@ fn adapterToken(format: u32) ?[*:0]const u8 {
 // ===== production code above =====
 
 test "ABI version is stable" {
-    try std.testing.expectEqual(@as(u32, 1), wayplug_abi_version());
-    try std.testing.expectEqual(@as(u32, 1), wayplug_adapter_abi_version());
+    try std.testing.expectEqual(@as(u32, 1), wayembed_abi_version());
+    try std.testing.expectEqual(@as(u32, 1), wayembed_adapter_abi_version());
 }
 
 test "Server null-handle is tolerated" {
-    wayplug_server_destroy(null);
-    try std.testing.expect(wayplug_server_get_fd(null) == -1);
-    try std.testing.expect(!wayplug_server_close_client_display(null, null));
-    try std.testing.expect(wayplug_server_snapshot(null) == null);
-    wayplug_snapshot_free(null);
-    try std.testing.expect(!wayplug_snapshot_get_counts(null, null));
+    wayembed_server_destroy(null);
+    try std.testing.expect(wayembed_server_get_fd(null) == -1);
+    try std.testing.expect(!wayembed_server_close_client_display(null, null));
+    try std.testing.expect(wayembed_server_snapshot(null) == null);
+    wayembed_snapshot_free(null);
+    try std.testing.expect(!wayembed_snapshot_get_counts(null, null));
 }
 
 test "adapter handoff initialization validates inputs" {
-    var handoff: WayplugAdapterHandoff = .{
-        .size = @sizeOf(WayplugAdapterHandoff),
+    var handoff: WayembedAdapterHandoff = .{
+        .size = @sizeOf(WayembedAdapterHandoff),
         .version = 0,
         .format = adapter_format_unknown,
         .server = null,
@@ -419,35 +419,35 @@ test "adapter handoff initialization validates inputs" {
         .format_userdata = null,
     };
 
-    try std.testing.expect(!wayplug_adapter_handoff_init(null, adapter_format_clap, null, null));
-    try std.testing.expect(!wayplug_adapter_handoff_init(&handoff, adapter_format_unknown, null, null));
-    try std.testing.expect(!wayplug_adapter_handoff_init(&handoff, adapter_format_clap, null, null));
+    try std.testing.expect(!wayembed_adapter_handoff_init(null, adapter_format_clap, null, null));
+    try std.testing.expect(!wayembed_adapter_handoff_init(&handoff, adapter_format_unknown, null, null));
+    try std.testing.expect(!wayembed_adapter_handoff_init(&handoff, adapter_format_clap, null, null));
 
     const server: *server_mod.Server = @ptrFromInt(@alignOf(server_mod.Server));
     const display: *wlc.wl_display = @ptrFromInt(1);
-    try std.testing.expect(wayplug_adapter_handoff_init(&handoff, adapter_format_clap, server, display));
-    try std.testing.expect(wayplug_adapter_handoff_validate(&handoff));
+    try std.testing.expect(wayembed_adapter_handoff_init(&handoff, adapter_format_clap, server, display));
+    try std.testing.expect(wayembed_adapter_handoff_validate(&handoff));
     try std.testing.expectEqual(adapter_abi_version, handoff.version);
     try std.testing.expectEqual(adapter_format_clap, handoff.format);
 
     handoff.version = adapter_abi_version + 1;
-    try std.testing.expect(!wayplug_adapter_handoff_validate(&handoff));
+    try std.testing.expect(!wayembed_adapter_handoff_validate(&handoff));
 }
 
 test "adapter resize validation rejects invalid dimensions" {
-    var resize: WayplugAdapterResize = .{
-        .size = @sizeOf(WayplugAdapterResize),
+    var resize: WayembedAdapterResize = .{
+        .size = @sizeOf(WayembedAdapterResize),
         .version = adapter_abi_version,
         .width = 320,
         .height = 200,
         .scale = 1,
     };
-    try std.testing.expect(wayplug_adapter_resize_validate(&resize));
+    try std.testing.expect(wayembed_adapter_resize_validate(&resize));
     resize.width = -1;
-    try std.testing.expect(!wayplug_adapter_resize_validate(&resize));
+    try std.testing.expect(!wayembed_adapter_resize_validate(&resize));
     resize.width = 320;
     resize.scale = 0;
-    try std.testing.expect(!wayplug_adapter_resize_validate(&resize));
+    try std.testing.expect(!wayembed_adapter_resize_validate(&resize));
 }
 
 test "snapshot count output validates size and version" {
@@ -465,10 +465,10 @@ test "snapshot count output validates size and version" {
             },
         },
     };
-    const opaque_snapshot: *const wayplug_snapshot = @ptrCast(@constCast(&snapshot_handle));
+    const opaque_snapshot: *const wayembed_snapshot = @ptrCast(@constCast(&snapshot_handle));
 
-    var counts: WayplugSnapshotCounts = .{
-        .size = @sizeOf(WayplugSnapshotCounts),
+    var counts: WayembedSnapshotCounts = .{
+        .size = @sizeOf(WayembedSnapshotCounts),
         .version = abi_version,
         .clients = 0,
         .resources = 0,
@@ -477,24 +477,24 @@ test "snapshot count output validates size and version" {
         .embeds = 0,
         .outputs = 0,
     };
-    try std.testing.expect(wayplug_snapshot_get_counts(opaque_snapshot, &counts));
+    try std.testing.expect(wayembed_snapshot_get_counts(opaque_snapshot, &counts));
     try std.testing.expectEqual(@as(usize, 1), counts.clients);
     try std.testing.expectEqual(@as(usize, 6), counts.outputs);
 
-    counts.size = @offsetOf(WayplugSnapshotCounts, "outputs");
+    counts.size = @offsetOf(WayembedSnapshotCounts, "outputs");
     counts.version = abi_version;
-    try std.testing.expect(!wayplug_snapshot_get_counts(opaque_snapshot, &counts));
+    try std.testing.expect(!wayembed_snapshot_get_counts(opaque_snapshot, &counts));
 
-    counts.size = @sizeOf(WayplugSnapshotCounts);
+    counts.size = @sizeOf(WayembedSnapshotCounts);
     counts.version = abi_version + 1;
-    try std.testing.expect(!wayplug_snapshot_get_counts(opaque_snapshot, &counts));
+    try std.testing.expect(!wayembed_snapshot_get_counts(opaque_snapshot, &counts));
 }
 
 test "host interface normalization accepts older append-only sizes" {
     var iface = emptyHostInterface();
-    iface.size = @offsetOf(WayplugHostInterface, "on_protocol_error");
+    iface.size = @offsetOf(WayembedHostInterface, "on_protocol_error");
     const normalized = normalizeHostInterface(&iface).?;
-    try std.testing.expectEqual(@sizeOf(WayplugHostInterface), normalized.size);
+    try std.testing.expectEqual(@sizeOf(WayembedHostInterface), normalized.size);
     try std.testing.expect(normalized.get_seat_capabilities == null);
     try std.testing.expect(normalized.get_seat_name == null);
     try std.testing.expect(normalized.get_output_info == null);
@@ -506,7 +506,7 @@ test "host interface normalization accepts older append-only sizes" {
 
 test "host interface normalization accepts pre-embed-callback sizes" {
     var iface = emptyHostInterface();
-    iface.size = @offsetOf(WayplugHostInterface, "on_embed_mapped");
+    iface.size = @offsetOf(WayembedHostInterface, "on_embed_mapped");
     const normalized = normalizeHostInterface(&iface).?;
     try std.testing.expect(normalized.on_protocol_error == null);
     try std.testing.expect(normalized.on_embed_mapped == null);
@@ -517,7 +517,7 @@ test "host interface normalization accepts pre-embed-callback sizes" {
 
 test "host interface normalization accepts pre-output-info sizes" {
     var iface = emptyHostInterface();
-    iface.size = @offsetOf(WayplugHostInterface, "get_output_info");
+    iface.size = @offsetOf(WayembedHostInterface, "get_output_info");
     const normalized = normalizeHostInterface(&iface).?;
     try std.testing.expect(normalized.get_output_info == null);
 }

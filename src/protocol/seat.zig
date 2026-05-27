@@ -104,7 +104,7 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
             wls.c.wl_resource_post_error(
                 seat_resource,
                 wls.c.WL_SEAT_ERROR_MISSING_CAPABILITY,
-                "wayplug does not expose the requested wl_seat capability",
+                "wayembed does not expose the requested wl_seat capability",
             );
         }
 

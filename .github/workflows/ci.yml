@@ -39,4 +39,4 @@ jobs:
         run: zig build test --summary all
 
       - name: Run Weston smoke
-        run: WAYPLUG_SMOKE_COMPOSITOR=weston zig build test --summary all
+        run: WAYEMBED_SMOKE_COMPOSITOR=weston zig build test --summary all

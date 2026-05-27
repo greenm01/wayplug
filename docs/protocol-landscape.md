@@ -55,5 +55,5 @@ adopted `WaylandUI` standard.
 VST3 has preliminary Wayland support through `IWaylandFrame`, reportedly using
 a proxy/nested-compositor style approach.
 
-`wayplug` should be format-neutral at the core and provide CLAP/LV2 adapters as
+`wayembed` should be format-neutral at the core and provide CLAP/LV2 adapters as
 separate layers.

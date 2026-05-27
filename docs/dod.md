@@ -1,11 +1,11 @@
 # Data-Oriented Design
 
-`wayplug` should use a data-oriented runtime built from plain types, indexed
+`wayembed` should use a data-oriented runtime built from plain types, indexed
 state, explicit mutation operations, query facades, systems for policy, and
 thin protocol adapters.
 
 The goal is not to turn Wayland into an Elm/TEA application. Wayland already
-has a protocol object model. `wayplug` should keep simple request/event
+has a protocol object model. `wayembed` should keep simple request/event
 forwarding direct, while using a data model for ownership, lifecycle, cleanup,
 diagnostics, and tests.
 
@@ -135,7 +135,7 @@ long-lived table and index uses that allocator. Ops and queries read the
 allocator from the model rather than taking it as a parameter.
 
 ```zig
-pub const WayplugModel = struct {
+pub const WayembedModel = struct {
     counters: IdCounters,
 
     clients: EntityManager(ClientId, Client),
@@ -449,7 +449,7 @@ operation should notify the host, update diagnostics, or schedule cleanup.
 
 Ops append effects to a per-dispatch queue. The engine drains the queue at
 the end of `dispatch()`, after every protocol callback for that tick has
-run. Host-visible effects fire as `wayplug_host_interface` callbacks.
+run. Host-visible effects fire as `wayembed_host_interface` callbacks.
 Diagnostic effects set snapshot dirty bits. Effects fire in append order
 and must not call back into ops.
 
@@ -502,7 +502,7 @@ Snapshots may allocate. Hot protocol paths should not.
 
 A snapshot is caller-owned. The snapshot function allocates with the server
 allocator and returns a value the caller releases with `snapshotFree()`. The
-C ABI exposes a matching `wayplug_snapshot_free()`. A snapshot is a copy;
+C ABI exposes a matching `wayembed_snapshot_free()`. A snapshot is a copy;
 subsequent ops do not invalidate it.
 
 `data/snapshot.zig` is comptime-generic. It walks every table in `model.zig`
@@ -544,7 +544,7 @@ coherent internal model for the parts most likely to break.
 
 ## Non-Goal
 
-`wayplug` should not become a full Elm/TEA runtime.
+`wayembed` should not become a full Elm/TEA runtime.
 
 Avoid this for every request:
 

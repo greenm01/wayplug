@@ -1,45 +1,45 @@
 //! Cross-domain engine integration tests.
 
 const std = @import("std");
-const wayplug = @import("wayplug");
+const wayembed = @import("wayembed");
 
-fn fakeWlClient(comptime address: usize) *wayplug.wayland.server.wl_client {
+fn fakeWlClient(comptime address: usize) *wayembed.wayland.server.wl_client {
     return @ptrFromInt(address);
 }
 
-fn fakeDisplay(comptime address: usize) *wayplug.wayland.client.wl_display {
+fn fakeDisplay(comptime address: usize) *wayembed.wayland.client.wl_display {
     return @ptrFromInt(address);
 }
 
-fn fakeProxy(comptime address: usize) *wayplug.wayland.client.wl_proxy {
+fn fakeProxy(comptime address: usize) *wayembed.wayland.client.wl_proxy {
     return @ptrFromInt(address);
 }
 
 test "embed attaches a child surface and clears on destroy" {
-    var m = wayplug.data.model.Model.init(std.testing.allocator);
+    var m = wayembed.data.model.Model.init(std.testing.allocator);
     defer m.deinit();
 
-    const cid = try wayplug.engine.client.clientCreate(&m, -1, -1);
+    const cid = try wayembed.engine.client.clientCreate(&m, -1, -1);
     const parent_rid = try m.nextResourceId();
     const child_rid = try m.nextResourceId();
-    const parent_sid = try wayplug.engine.surface.surfaceCreate(&m, cid, parent_rid);
-    const child_sid = try wayplug.engine.surface.surfaceCreate(&m, cid, child_rid);
+    const parent_sid = try wayembed.engine.surface.surfaceCreate(&m, cid, parent_rid);
+    const child_sid = try wayembed.engine.surface.surfaceCreate(&m, cid, child_rid);
 
-    const eid = try wayplug.engine.embed.embedCreate(&m, cid, parent_sid);
-    try wayplug.engine.embed.embedAttachChild(&m, eid, child_sid);
-    try wayplug.engine.embed.embedResize(&m, eid, 320, 240);
+    const eid = try wayembed.engine.embed.embedCreate(&m, cid, parent_sid);
+    try wayembed.engine.embed.embedAttachChild(&m, eid, child_sid);
+    try wayembed.engine.embed.embedResize(&m, eid, 320, 240);
 
     const e = m.embeds.get(eid).?;
     try std.testing.expect(e.state == .child_ready);
     try std.testing.expect(e.width == 320);
-    try std.testing.expect(wayplug.engine.embed.embedForChildSurface(&m, child_sid).? == eid);
+    try std.testing.expect(wayembed.engine.embed.embedForChildSurface(&m, child_sid).? == eid);
 
-    wayplug.engine.embed.embedDestroy(&m, eid);
-    try std.testing.expect(wayplug.engine.embed.embedForChildSurface(&m, child_sid) == null);
+    wayembed.engine.embed.embedDestroy(&m, eid);
+    try std.testing.expect(wayembed.engine.embed.embedForChildSurface(&m, child_sid) == null);
 }
 
 test "effect queue retains append order until cleared" {
-    var q = wayplug.engine.effects.Queue.init(std.testing.allocator);
+    var q = wayembed.engine.effects.Queue.init(std.testing.allocator);
     defer q.deinit();
 
     try q.push(.{ .client_connected = @enumFromInt(1) });
@@ -55,7 +55,7 @@ test "effect queue retains append order until cleared" {
 }
 
 test "embed map and resize queue lifecycle effects" {
-    var engine = wayplug.engine.Engine.init(std.testing.allocator);
+    var engine = wayembed.engine.Engine.init(std.testing.allocator);
     defer engine.deinit();
 
     const cid = try engine.clientCreate(-1, -1);
@@ -77,7 +77,7 @@ test "embed map and resize queue lifecycle effects" {
 }
 
 test "clientDestroy tears down owned embed graph and indexes before client_closed effect" {
-    var engine = wayplug.engine.Engine.init(std.testing.allocator);
+    var engine = wayembed.engine.Engine.init(std.testing.allocator);
     defer engine.deinit();
 
     const cid = try engine.clientCreate(-1, -1);
@@ -93,7 +93,7 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
 
     const parent_sid = try engine.surfaceCreate(cid, parent_rid);
     const child_sid = try engine.surfaceCreate(cid, child_rid);
-    const buffer_id = try wayplug.engine.buffer.bufferCreate(&engine.model, cid, buffer_rid);
+    const buffer_id = try wayembed.engine.buffer.bufferCreate(&engine.model, cid, buffer_rid);
     const embed_id = try engine.embedCreate(cid, parent_sid);
     try engine.embedAttachChild(embed_id, child_sid);
     try engine.embedSetSubsurfaceResource(embed_id, subsurface_rid);
@@ -132,7 +132,7 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
 }
 
 test "clientDestroy preserves records owned by other clients" {
-    var engine = wayplug.engine.Engine.init(std.testing.allocator);
+    var engine = wayembed.engine.Engine.init(std.testing.allocator);
     defer engine.deinit();
 
     const doomed = try engine.clientCreate(-1, -1);

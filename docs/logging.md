@@ -1,7 +1,7 @@
 # Logging
 
-wayplug does not emit log lines. It surfaces structured lifecycle events
-through the `wayplug_host_interface` callback table. Logging is a host
+wayembed does not emit log lines. It surfaces structured lifecycle events
+through the `wayembed_host_interface` callback table. Logging is a host
 responsibility.
 
 This keeps the library free of log-format opinions and output-fd assumptions,
@@ -14,37 +14,37 @@ as callbacks.
 
 ## Current Callback Surface
 
-The `wayplug_host_interface` struct carries lifecycle and diagnostics
-callbacks. They fire synchronously from inside `wayplug_server_dispatch()`
+The `wayembed_host_interface` struct carries lifecycle and diagnostics
+callbacks. They fire synchronously from inside `wayembed_server_dispatch()`
 after the effect queue drains. A null function pointer is a no-op.
 
 ```c
-void (*on_client_connected)(void *userdata, wayplug_client *client);
+void (*on_client_connected)(void *userdata, wayembed_client *client);
 ```
 
-Fires when a plugin opens a display via `wayplug_server_open_client_display`.
+Fires when a plugin opens a display via `wayembed_server_open_client_display`.
 `client` is valid until `on_client_closed` fires for the same client.
 
 ```c
 void (*on_surface_created)(void *userdata,
-                           wayplug_client *client,
+                           wayembed_client *client,
                            struct wl_surface *plugin_child_surface);
 ```
 
 Fires when the plugin calls `wl_compositor.create_surface`. The host
-typically calls `wayplug_embed_attach` here to parent the surface.
+typically calls `wayembed_embed_attach` here to parent the surface.
 
 ```c
-void (*on_client_closed)(void *userdata, wayplug_client *client);
+void (*on_client_closed)(void *userdata, wayembed_client *client);
 ```
 
-Fires after wayplug completes the full client teardown sequence (see
+Fires after wayembed completes the full client teardown sequence (see
 [Architecture § Teardown Order](architecture.md#teardown-order)). After this
 callback returns, `client` is invalid and must not be dereferenced.
 
 ```c
 void (*on_protocol_error)(void *userdata,
-                          wayplug_client *client,
+                          wayembed_client *client,
                           uint32_t code);
 ```
 
@@ -58,7 +58,7 @@ objects during bind surface as `WL_DISPLAY_ERROR_IMPLEMENTATION`.
 void (*on_embed_mapped)(void *userdata, uint32_t embed_id);
 ```
 
-Fires after `wayplug_embed_attach` establishes the parent/child/subsurface
+Fires after `wayembed_embed_attach` establishes the parent/child/subsurface
 relationship. `embed_id` is stable for the server lifetime and is not reused.
 
 ```c
@@ -68,7 +68,7 @@ void (*on_embed_resized)(void *userdata,
                          int32_t height);
 ```
 
-Fires when `wayplug_embed_resize` updates an existing embed.
+Fires when `wayembed_embed_resize` updates an existing embed.
 
 ```c
 void (*on_embed_destroyed)(void *userdata, uint32_t embed_id);
@@ -81,7 +81,7 @@ destroys that client's embeds.
 
 - Callbacks return `void`. They report; they do not gate. Policy decisions
   run in the engine before the notification fires.
-- `on_surface_created` may call `wayplug_embed_attach` on the same server to
+- `on_surface_created` may call `wayembed_embed_attach` on the same server to
   establish the embedded editor session. Other same-server calls from
   callbacks are undefined.
 - Callbacks may issue Wayland calls on the host's own upstream connection.
@@ -94,20 +94,20 @@ destroys that client's embeds.
 The public C ABI exposes an allocating diagnostic snapshot:
 
 ```c
-wayplug_snapshot *wayplug_server_snapshot(wayplug_server *server);
-bool wayplug_snapshot_get_counts(const wayplug_snapshot *snapshot,
-                                 wayplug_snapshot_counts *counts);
-void wayplug_snapshot_free(wayplug_snapshot *snapshot);
+wayembed_snapshot *wayembed_server_snapshot(wayembed_server *server);
+bool wayembed_snapshot_get_counts(const wayembed_snapshot *snapshot,
+                                 wayembed_snapshot_counts *counts);
+void wayembed_snapshot_free(wayembed_snapshot *snapshot);
 ```
 
 Snapshots are point-in-time copies. Later server operations do not mutate an
 existing snapshot. The caller owns each snapshot and must release it with
-`wayplug_snapshot_free`. The current C view exposes table counts; record-level
+`wayembed_snapshot_free`. The current C view exposes table counts; record-level
 iteration is intentionally left for a later diagnostic schema.
 
 ## Stable Identifiers for Log Lines
 
-Use `wayplug_client *` as the stable key in log output. It is an opaque
+Use `wayembed_client *` as the stable key in log output. It is an opaque
 handle that uniquely identifies a client within the server's lifetime and
 does not change addresses while the client is alive.
 
@@ -115,12 +115,12 @@ Prefer it over `wl_display *` or raw file descriptor numbers, which are not
 stable across server restarts or between runs.
 
 ```c
-static void on_client_connected(void *u, wayplug_client *client) {
-    fprintf(stderr, "wayplug: client connected %p\n", (void *)client);
+static void on_client_connected(void *u, wayembed_client *client) {
+    fprintf(stderr, "wayembed: client connected %p\n", (void *)client);
 }
 
-static void on_client_closed(void *u, wayplug_client *client) {
-    fprintf(stderr, "wayplug: client closed %p\n", (void *)client);
+static void on_client_closed(void *u, wayembed_client *client) {
+    fprintf(stderr, "wayembed: client closed %p\n", (void *)client);
 }
 ```
 
@@ -133,20 +133,20 @@ comparing logs across runs of the same session type.
 Minimal logging for a production host — connect, surface, and close events:
 
 ```c
-static void on_client_connected(void *u, wayplug_client *client) {
+static void on_client_connected(void *u, wayembed_client *client) {
     struct my_host *h = u;
     fprintf(h->log, "plugin connected: client=%p\n", (void *)client);
 }
 
-static void on_surface_created(void *u, wayplug_client *client,
+static void on_surface_created(void *u, wayembed_client *client,
                                struct wl_surface *child) {
     struct my_host *h = u;
     fprintf(h->log, "plugin surface: client=%p surface=%p\n",
             (void *)client, (void *)child);
-    wayplug_embed_attach(client, h->editor_parent_surface, child);
+    wayembed_embed_attach(client, h->editor_parent_surface, child);
 }
 
-static void on_client_closed(void *u, wayplug_client *client) {
+static void on_client_closed(void *u, wayembed_client *client) {
     struct my_host *h = u;
     fprintf(h->log, "plugin disconnected: client=%p\n", (void *)client);
     my_host_clear_editor(h);
@@ -183,12 +183,12 @@ evidence that can be compared across runs. This matches [AGENTS.md §
 Debugging Evidence](../AGENTS.md#debugging-evidence).
 
 **State snapshots** — take a snapshot of callback-visible state before and
-after the reproducing step. Use `wayplug_server_snapshot` plus
-`wayplug_snapshot_get_counts` to record current table counts. Pair these with
+after the reproducing step. Use `wayembed_server_snapshot` plus
+`wayembed_snapshot_get_counts` to record current table counts. Pair these with
 host-tracked details such as surfaces attached or embeds active until
 record-level snapshot iteration lands.
 
-**Client handle** — the `wayplug_client *` value is the most useful
+**Client handle** — the `wayembed_client *` value is the most useful
 cross-run key. It is the anchor that ties connect, surface-created, and close
 events together.
 

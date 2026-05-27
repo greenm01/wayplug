@@ -1,6 +1,6 @@
 # Architecture
 
-`wayplug` should use a hybrid architecture.
+`wayembed` should use a hybrid architecture.
 
 The Wayland protocol hot path should stay direct and object-oriented. A small
 central state layer should handle lifecycle, ownership, policy, and cleanup.
@@ -19,7 +19,7 @@ Host application
         | C ABI
         v
 +-----------------------------+
-| wayplug server              |
+| wayembed server              |
 |                             |
 | central lifecycle state     |
 | client/embed/object tables  |
@@ -50,12 +50,12 @@ This is the proposed starting structure. It is intentionally modular, but not
 deeply abstract. Each directory should have a narrow job.
 
 ```text
-wayplug/
+wayembed/
   build.zig
   include/
-    wayplug.h
+    wayembed.h
   src/
-    wayplug.zig
+    wayembed.zig
 
     c_api.zig
     server.zig
@@ -120,14 +120,14 @@ one file lets the boundary live in function names instead.
 
 ## Module Roles
 
-`include/wayplug.h` is the stable public ABI. It should expose opaque handles,
+`include/wayembed.h` is the stable public ABI. It should expose opaque handles,
 versioned structs, plain C callbacks, and no Zig-specific types.
 
 `src/c_api.zig` should be the only layer that directly implements exported C
 symbols. It validates ABI structs, translates C handles into internal pointers,
 and calls the internal server API.
 
-`src/server.zig` owns the runtime object behind `wayplug_server`. It wires
+`src/server.zig` owns the runtime object behind `wayembed_server`. It wires
 together host callbacks, state, protocol setup, dispatch, flush, and teardown.
 
 `src/host.zig` wraps the host-provided callback table. Internal code should use
@@ -150,7 +150,7 @@ modules translate callbacks, validate ownership, forward simple requests,
 and call into `engine/` for lifecycle changes.
 
 `src/wayland/` is a thin binding/helper layer around generated Wayland
-interfaces and C imports. It should not own Wayplug state.
+interfaces and C imports. It should not own Wayembed state.
 
 ## What Stays Direct
 
@@ -255,16 +255,16 @@ onProtocolError(client, error)
 
 ## Host Notifications
 
-The host receives lifecycle events through the `wayplug_host_interface`
-callback struct declared in [../include/wayplug.h](../include/wayplug.h).
+The host receives lifecycle events through the `wayembed_host_interface`
+callback struct declared in [../include/wayembed.h](../include/wayembed.h).
 The engine calls these callbacks synchronously from inside
-`wayplug_server_dispatch()`.
+`wayembed_server_dispatch()`.
 
 Rules:
 
 - Callbacks return `void`. They report; they do not gate. Policy decisions
   belong in `src/engine/` and run before the notification fires.
-- Callbacks must not call back into the same `wayplug_server` instance.
+- Callbacks must not call back into the same `wayembed_server` instance.
   They may issue Wayland calls on the host's own upstream connection.
 - A null function pointer in the host interface is a no-op.
 - The engine drains its effect queue at the end of each dispatch tick, after
@@ -286,10 +286,10 @@ protocol delegate callback
         +-- central state notification when lifecycle changes
 ```
 
-`wayplug` does not own a dispatch loop. The server exposes its fd through
-`wayplug_server_get_fd()`. The host adds that fd to its event loop and calls
-`wayplug_server_dispatch()` when the fd becomes readable. The host calls
-`wayplug_server_flush()` before blocking. `wayplug` never spawns threads or
+`wayembed` does not own a dispatch loop. The server exposes its fd through
+`wayembed_server_get_fd()`. The host adds that fd to its event loop and calls
+`wayembed_server_dispatch()` when the fd becomes readable. The host calls
+`wayembed_server_flush()` before blocking. `wayembed` never spawns threads or
 polls on its own.
 
 ## Ownership Model
@@ -297,7 +297,7 @@ polls on its own.
 The central server should own all long-lived objects.
 
 ```text
-WayplugServer
+WayembedServer
   clients[]
   embeds[]
   resources[]
@@ -373,10 +373,10 @@ Good central/policy responsibilities:
 For the first implementation, keep the centralized state small:
 
 ```text
-WayplugServer
-WayplugClient
-WayplugResource
-WayplugEmbed
+WayembedServer
+WayembedClient
+WayembedResource
+WayembedEmbed
 ```
 
 Start with direct delegates for:
@@ -399,7 +399,7 @@ after the lifecycle model is stable.
 
 ## Non-Goal
 
-`wayplug` should not become a full Elm/TEA runtime.
+`wayembed` should not become a full Elm/TEA runtime.
 
 The useful part is not the TEA pattern itself. The useful part is having
 explicit state transitions for lifecycle-sensitive operations while preserving

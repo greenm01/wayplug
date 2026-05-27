@@ -1,6 +1,6 @@
 # Style Guide
 
-This guide defines the code style and architecture discipline for `wayplug`.
+This guide defines the code style and architecture discipline for `wayembed`.
 The formatter handles whitespace; this guide handles judgment.
 
 ## Formatter
@@ -30,10 +30,10 @@ Zig code:
 
 C ABI:
 
-- Public functions: `wayplug_snake_case`
-- Public structs: `wayplug_snake_case`
-- Public macros: `WAYPLUG_UPPER_SNAKE_CASE`
-- Public typedefs: `wayplug_snake_case`
+- Public functions: `wayembed_snake_case`
+- Public structs: `wayembed_snake_case`
+- Public macros: `WAYEMBED_UPPER_SNAKE_CASE`
+- Public typedefs: `wayembed_snake_case`
 
 Examples:
 
@@ -52,11 +52,11 @@ pub fn resourceForWlResource(model: *const Model, resource: *wl_resource) ?Resou
 ```
 
 ```c
-#define WAYPLUG_ABI_VERSION 1u
+#define WAYEMBED_ABI_VERSION 1u
 
-typedef struct wayplug_server wayplug_server;
+typedef struct wayembed_server wayembed_server;
 
-uint32_t wayplug_abi_version(void);
+uint32_t wayembed_abi_version(void);
 ```
 
 ## Data And Logic
@@ -164,9 +164,9 @@ pub fn deinit(model: *Model) void {
 ```
 
 The server allocator is chosen at server creation. For MVP,
-`wayplug_server_create()` uses `std.heap.c_allocator`. A future ABI version
-may accept a host-supplied allocator interface (`wayplug_allocator_v1`) for
-hosts that need to track wayplug allocations.
+`wayembed_server_create()` uses `std.heap.c_allocator`. A future ABI version
+may accept a host-supplied allocator interface (`wayembed_allocator_v1`) for
+hosts that need to track wayembed allocations.
 
 ## Error Handling
 
@@ -187,7 +187,7 @@ through operations.
 
 ## C ABI Boundary
 
-`include/wayplug.h` is the stable contract.
+`include/wayembed.h` is the stable contract.
 
 Rules:
 
@@ -202,10 +202,10 @@ Rules:
 `src/c_api.zig` should be the only module that exports public C symbols.
 Internal modules should not know about public ABI validation details.
 
-`wayplug_server_destroy(srv)` invalidates every handle the server has
+`wayembed_server_destroy(srv)` invalidates every handle the server has
 issued, including client displays and resources. The host must stop using
 those handles before calling destroy. Destroy is the only guaranteed path
-to release server-owned memory; `wayplug_server_close_client_display()`
+to release server-owned memory; `wayembed_server_close_client_display()`
 only tears down a single client.
 
 ## Wayland Handles

@@ -1,7 +1,7 @@
 # C ABI Sketch
 
 This is historical design context, not the committed API. The source of
-truth for the public ABI is [../include/wayplug.h](../include/wayplug.h).
+truth for the public ABI is [../include/wayembed.h](../include/wayembed.h).
 The sketch below remains useful for seeing the intended C shape and ABI
 rules that guided the first implementation.
 
@@ -23,11 +23,11 @@ struct wl_output;
 struct xdg_wm_base;
 struct zwp_linux_dmabuf_v1;
 
-typedef struct wayplug_server wayplug_server;
-typedef struct wayplug_client wayplug_client;
-typedef struct wayplug_resource wayplug_resource;
+typedef struct wayembed_server wayembed_server;
+typedef struct wayembed_client wayembed_client;
+typedef struct wayembed_resource wayembed_resource;
 
-typedef struct wayplug_output_info {
+typedef struct wayembed_output_info {
     uint32_t size;
     uint32_t version;
     int32_t x;
@@ -45,9 +45,9 @@ typedef struct wayplug_output_info {
     int32_t scale;
     const char *name;
     const char *description;
-} wayplug_output_info;
+} wayembed_output_info;
 
-typedef struct wayplug_host_interface {
+typedef struct wayembed_host_interface {
     uint32_t size;
     uint32_t version;
     void *userdata;
@@ -66,13 +66,13 @@ typedef struct wayplug_host_interface {
                                   struct wl_surface *parent,
                                   struct wl_surface *child);
 
-    void (*on_client_connected)(void *userdata, wayplug_client *client);
+    void (*on_client_connected)(void *userdata, wayembed_client *client);
     void (*on_surface_created)(void *userdata,
-                               wayplug_client *client,
+                               wayembed_client *client,
                                struct wl_surface *plugin_child_surface);
-    void (*on_client_closed)(void *userdata, wayplug_client *client);
+    void (*on_client_closed)(void *userdata, wayembed_client *client);
     void (*on_protocol_error)(void *userdata,
-                              wayplug_client *client,
+                              wayembed_client *client,
                               uint32_t code);
     void (*on_embed_mapped)(void *userdata, uint32_t embed_id);
     void (*on_embed_resized)(void *userdata,
@@ -83,27 +83,27 @@ typedef struct wayplug_host_interface {
 
     uint32_t (*get_seat_capabilities)(void *userdata);
     const char *(*get_seat_name)(void *userdata);
-    bool (*get_output_info)(void *userdata, wayplug_output_info *info);
-} wayplug_host_interface;
+    bool (*get_output_info)(void *userdata, wayembed_output_info *info);
+} wayembed_host_interface;
 
-wayplug_server *wayplug_server_create(const wayplug_host_interface *host,
+wayembed_server *wayembed_server_create(const wayembed_host_interface *host,
                                       struct wl_event_queue *queue);
 
-void wayplug_server_destroy(wayplug_server *server);
+void wayembed_server_destroy(wayembed_server *server);
 
-int wayplug_server_get_fd(wayplug_server *server);
-void wayplug_server_dispatch(wayplug_server *server);
-void wayplug_server_flush(wayplug_server *server);
+int wayembed_server_get_fd(wayembed_server *server);
+void wayembed_server_dispatch(wayembed_server *server);
+void wayembed_server_flush(wayembed_server *server);
 
-struct wl_display *wayplug_server_open_client_display(wayplug_server *server);
-bool wayplug_server_close_client_display(wayplug_server *server,
+struct wl_display *wayembed_server_open_client_display(wayembed_server *server);
+bool wayembed_server_close_client_display(wayembed_server *server,
                                          struct wl_display *display);
 
-struct wl_proxy *wayplug_server_create_proxy(wayplug_server *server,
+struct wl_proxy *wayembed_server_create_proxy(wayembed_server *server,
                                              struct wl_display *client_display,
                                              struct wl_proxy *host_object,
-                                             wayplug_resource *implementation);
-void wayplug_server_destroy_proxy(wayplug_server *server,
+                                             wayembed_resource *implementation);
+void wayembed_server_destroy_proxy(wayembed_server *server,
                                   struct wl_proxy *proxy);
 ```
 
@@ -113,7 +113,7 @@ void wayplug_server_destroy_proxy(wayplug_server *server,
 - Append-only callback-table fields are guarded by `size`; missing fields
   are treated as null callbacks.
 - Public object types should be opaque.
-- The library owns objects returned by `wayplug_*_create`.
+- The library owns objects returned by `wayembed_*_create`.
 - Callers release objects with matching destroy/close functions.
 - The API should not expose implementation-language types.
 - Avoid callbacks from arbitrary threads unless explicitly documented.

@@ -5,22 +5,22 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const xdg = xdgProtocol(b);
 
-    const wayplug_mod = b.addModule("wayplug", .{
-        .root_source_file = b.path("src/wayplug.zig"),
+    const wayembed_mod = b.addModule("wayembed", .{
+        .root_source_file = b.path("src/wayembed.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
     });
-    linkWayland(wayplug_mod);
-    addXdgProtocol(wayplug_mod, xdg);
+    linkWayland(wayembed_mod);
+    addXdgProtocol(wayembed_mod, xdg);
 
     const lib = b.addLibrary(.{
         .linkage = .static,
-        .name = "wayplug",
-        .root_module = wayplug_mod,
+        .name = "wayembed",
+        .root_module = wayembed_mod,
     });
-    lib.installHeader(b.path("include/wayplug.h"), "wayplug.h");
-    lib.installHeader(b.path("include/wayplug_adapters.h"), "wayplug_adapters.h");
+    lib.installHeader(b.path("include/wayembed.h"), "wayembed.h");
+    lib.installHeader(b.path("include/wayembed_adapters.h"), "wayembed_adapters.h");
     b.installArtifact(lib);
 
     const test_step = b.step("test", "Run unit and C ABI smoke tests");
@@ -28,7 +28,7 @@ pub fn build(b: *std.Build) void {
 
     // Unit tests: drive the in-file `test` blocks under src/.
     const unit_test_mod = b.createModule(.{
-        .root_source_file = b.path("src/wayplug.zig"),
+        .root_source_file = b.path("src/wayembed.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
@@ -44,7 +44,7 @@ pub fn build(b: *std.Build) void {
     previous_test_run = &unit_run.step;
     test_step.dependOn(&unit_run.step);
 
-    // Integration tests: each file imports the `wayplug` module.
+    // Integration tests: each file imports the `wayembed` module.
     const integration_test_files = [_][]const u8{
         "tests/data_tests.zig",
         "tests/engine_tests.zig",
@@ -57,7 +57,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .link_libc = true,
         });
-        mod.addImport("wayplug", wayplug_mod);
+        mod.addImport("wayembed", wayembed_mod);
         linkWayland(mod);
         const t = b.addTest(.{ .root_module = mod });
         const run = b.addRunArtifact(t);
@@ -71,7 +71,7 @@ pub fn build(b: *std.Build) void {
 
     // C ABI smoke: compile c_abi_smoke.c against the static lib.
     const c_abi_smoke = b.addExecutable(.{
-        .name = "wayplug-c-abi-smoke",
+        .name = "wayembed-c-abi-smoke",
         .root_module = b.createModule(.{
             .target = target,
             .optimize = optimize,
@@ -93,11 +93,11 @@ pub fn build(b: *std.Build) void {
 }
 
 fn removeSmokeEnvironment(run: *std.Build.Step.Run) void {
-    run.removeEnvironmentVariable("WAYPLUG_SMOKE_COMPOSITOR");
-    run.removeEnvironmentVariable("WAYPLUG_RIVER_BIN");
-    run.removeEnvironmentVariable("WAYPLUG_MUTTER_BIN");
-    run.removeEnvironmentVariable("WAYPLUG_NIRI_BIN");
-    run.removeEnvironmentVariable("WAYPLUG_KWIN_BIN");
+    run.removeEnvironmentVariable("WAYEMBED_SMOKE_COMPOSITOR");
+    run.removeEnvironmentVariable("WAYEMBED_RIVER_BIN");
+    run.removeEnvironmentVariable("WAYEMBED_MUTTER_BIN");
+    run.removeEnvironmentVariable("WAYEMBED_NIRI_BIN");
+    run.removeEnvironmentVariable("WAYEMBED_KWIN_BIN");
 }
 
 const XdgProtocol = struct {

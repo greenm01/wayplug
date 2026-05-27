@@ -1,9 +1,9 @@
-# wayplug
+# wayembed
 
 A small Wayland delegated-server library for hosting plugin UIs without X11
 or XEmbed.
 
-`wayplug` lets a host program run an internal Wayland server, hand a plugin
+`wayembed` lets a host program run an internal Wayland server, hand a plugin
 its own connection to that server, and embed the plugin's surface as a
 subsurface of a host-owned parent. The public boundary is plain C, so hosts
 and plugins in any language can bind to it.
