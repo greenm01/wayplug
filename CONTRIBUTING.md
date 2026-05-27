@@ -40,12 +40,21 @@ plugins and hosts that bind to wayplug.
 - Adding a field at the end of a versioned struct, when readers gate
   access by checking the struct's `version` field.
 
+Example: adding an optional callback to the end of
+`wayplug_host_interface` does not require a bump when
+`src/c_api.zig` copies the field only if the caller's `size` reaches that
+field. Older callers leave the callback null and keep the same behavior.
+
 ### Bump `WAYPLUG_ABI_VERSION`
 
 - Removing or repurposing a field in a public struct.
 - Changing a function signature or its ownership rules.
 - Changing struct layout in any way that breaks size compatibility.
 - Changing the meaning of an existing return value or error code.
+
+Example: changing `wayplug_embed_resize` from client-scoped resize to a
+new handle-scoped resize would require a bump, because existing callers
+would pass the wrong object and the ownership contract would change.
 
 ### When you bump
 

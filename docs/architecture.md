@@ -256,8 +256,9 @@ onProtocolError(client, error)
 ## Host Notifications
 
 The host receives lifecycle events through the `wayplug_host_interface`
-callback struct defined in [C ABI Sketch](c-abi-sketch.md). The engine calls
-these callbacks synchronously from inside `wayplug_server_dispatch()`.
+callback struct declared in [../include/wayplug.h](../include/wayplug.h).
+The engine calls these callbacks synchronously from inside
+`wayplug_server_dispatch()`.
 
 Rules:
 

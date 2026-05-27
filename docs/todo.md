@@ -91,9 +91,6 @@ Out of MVP scope. Companion path for floating plugin windows.
 
 These came up while writing other docs but did not fit the current scope.
 
-- Pin the ABI-bump policy with a worked example the first time a real break
-  happens. Rules live in [../CONTRIBUTING.md](../CONTRIBUTING.md); no example
-  yet.
 - Keep [wsd-architecture.md](wsd-architecture.md) as a prior-art reference.
   It is not a contract for wayplug, but it remains useful context for the
   delegated-server model and protocol coverage decisions.

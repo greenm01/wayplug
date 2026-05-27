@@ -1,6 +1,9 @@
 # C ABI Sketch
 
-This is a rough sketch, not a committed API.
+This is historical design context, not the committed API. The source of
+truth for the public ABI is [../include/wayplug.h](../include/wayplug.h).
+The sketch below remains useful for seeing the intended C shape and ABI
+rules that guided the first implementation.
 
 ```c
 #pragma once
