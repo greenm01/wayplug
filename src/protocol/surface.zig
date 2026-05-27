@@ -19,20 +19,39 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
     const callback_bindings = callback_protocol.Bindings(Server, ResourceData);
 
     return struct {
-        pub const impl = wls.c.struct_wl_surface_interface{
-            .destroy = surfaceDestroy,
-            .attach = surfaceAttach,
-            .damage = surfaceDamage,
-            .frame = surfaceFrame,
-            .set_opaque_region = surfaceSetOpaqueRegion,
-            .set_input_region = surfaceSetInputRegion,
-            .commit = surfaceCommit,
-            .set_buffer_transform = surfaceSetBufferTransform,
-            .set_buffer_scale = surfaceSetBufferScale,
-            .damage_buffer = surfaceDamageBuffer,
-            .offset = null,
-            .get_release = null,
-        };
+        pub const impl = surfaceImpl();
+
+        fn surfaceImpl() wls.c.struct_wl_surface_interface {
+            if (comptime @hasField(wls.c.struct_wl_surface_interface, "get_release")) {
+                return .{
+                    .destroy = surfaceDestroy,
+                    .attach = surfaceAttach,
+                    .damage = surfaceDamage,
+                    .frame = surfaceFrame,
+                    .set_opaque_region = surfaceSetOpaqueRegion,
+                    .set_input_region = surfaceSetInputRegion,
+                    .commit = surfaceCommit,
+                    .set_buffer_transform = surfaceSetBufferTransform,
+                    .set_buffer_scale = surfaceSetBufferScale,
+                    .damage_buffer = surfaceDamageBuffer,
+                    .offset = null,
+                    .get_release = null,
+                };
+            }
+            return .{
+                .destroy = surfaceDestroy,
+                .attach = surfaceAttach,
+                .damage = surfaceDamage,
+                .frame = surfaceFrame,
+                .set_opaque_region = surfaceSetOpaqueRegion,
+                .set_input_region = surfaceSetInputRegion,
+                .commit = surfaceCommit,
+                .set_buffer_transform = surfaceSetBufferTransform,
+                .set_buffer_scale = surfaceSetBufferScale,
+                .damage_buffer = surfaceDamageBuffer,
+                .offset = null,
+            };
+        }
 
         fn surfaceDestroy(_: ?*wls.wl_client, resource: ?*wls.wl_resource) callconv(.c) void {
             if (H.dataForResource(resource)) |data| {
