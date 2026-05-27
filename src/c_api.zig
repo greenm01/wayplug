@@ -83,17 +83,17 @@ export fn wayplug_server_flush(server: ?*server_mod.Server) callconv(.c) void {
 export fn wayplug_server_open_client_display(
     server: ?*server_mod.Server,
 ) callconv(.c) ?*wlc.wl_display {
-    _ = server;
-    return null;
+    const s = server orelse return null;
+    return s.openClientDisplay();
 }
 
 export fn wayplug_server_close_client_display(
     server: ?*server_mod.Server,
     display: ?*wlc.wl_display,
 ) callconv(.c) bool {
-    _ = server;
-    _ = display;
-    return false;
+    const s = server orelse return false;
+    const d = display orelse return false;
+    return s.closeClientDisplay(d);
 }
 
 export fn wayplug_server_create_proxy(
@@ -120,10 +120,10 @@ export fn wayplug_embed_attach(
     parent_surface: ?*wlp.wl_surface,
     child_surface: ?*wlp.wl_surface,
 ) callconv(.c) bool {
-    _ = client;
-    _ = parent_surface;
-    _ = child_surface;
-    return false;
+    const c = clientHandle(client) orelse return false;
+    const parent = parent_surface orelse return false;
+    const child = child_surface orelse return false;
+    return c.server.embedAttach(c, parent, child);
 }
 
 export fn wayplug_embed_resize(
@@ -131,10 +131,13 @@ export fn wayplug_embed_resize(
     width: i32,
     height: i32,
 ) callconv(.c) bool {
-    _ = client;
-    _ = width;
-    _ = height;
-    return false;
+    const c = clientHandle(client) orelse return false;
+    return c.server.embedResize(c, width, height);
+}
+
+fn clientHandle(client: ?*wayplug_client) ?*server_mod.ClientHandle {
+    const c = client orelse return null;
+    return @ptrCast(@alignCast(c));
 }
 
 // ===== production code above =====

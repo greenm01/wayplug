@@ -30,6 +30,78 @@ pub const Engine = struct {
         self.effects.deinit();
         self.model.deinit();
     }
+
+    pub fn clientCreate(self: *Engine, server_fd: i32, client_fd: i32) !types.ClientId {
+        const id = try client.clientCreate(&self.model, server_fd, client_fd);
+        errdefer client.clientDestroy(&self.model, id);
+        try self.effects.push(.{ .client_connected = id });
+        return id;
+    }
+
+    pub fn clientSetWaylandHandles(
+        self: *Engine,
+        id: types.ClientId,
+        wl_client: *@import("../wayland/server.zig").wl_client,
+        display: *@import("../wayland/client.zig").wl_display,
+    ) !void {
+        try client.clientSetWaylandHandles(&self.model, id, wl_client, display);
+    }
+
+    pub fn clientDestroy(self: *Engine, id: types.ClientId) !void {
+        if (!self.model.clients.contains(id)) return;
+        try self.effects.push(.{ .client_closed = id });
+        client.clientDestroy(&self.model, id);
+    }
+
+    pub fn resourceCreate(
+        self: *Engine,
+        client_id: types.ClientId,
+        kind: types.ResourceKind,
+        wl_resource: ?*@import("../wayland/server.zig").wl_resource,
+        upstream_proxy: ?*@import("../wayland/client.zig").wl_proxy,
+    ) !types.ResourceId {
+        return resource.resourceCreate(&self.model, client_id, kind, wl_resource, upstream_proxy);
+    }
+
+    pub fn resourceDestroy(self: *Engine, id: types.ResourceId) void {
+        resource.resourceDestroy(&self.model, id);
+    }
+
+    pub fn surfaceCreate(self: *Engine, client_id: types.ClientId, resource_id: types.ResourceId) !types.SurfaceId {
+        const id = try surface.surfaceCreate(&self.model, client_id, resource_id);
+        errdefer surface.surfaceDestroy(&self.model, id);
+        try self.effects.push(.{ .surface_created = .{ .client_id = client_id, .surface_id = id } });
+        return id;
+    }
+
+    pub fn surfaceForResource(self: *const Engine, resource_id: types.ResourceId) ?types.SurfaceId {
+        return surface.surfaceForResource(&self.model, resource_id);
+    }
+
+    pub fn upstreamProxyForResource(self: *const Engine, resource_id: types.ResourceId) ?*@import("../wayland/client.zig").wl_proxy {
+        return resource.upstreamProxyForResource(&self.model, resource_id);
+    }
+
+    pub fn resourceForUpstreamProxy(self: *const Engine, proxy: *@import("../wayland/client.zig").wl_proxy) ?types.ResourceId {
+        return resource.resourceForUpstreamProxy(&self.model, proxy);
+    }
+
+    pub fn embedCreate(self: *Engine, client_id: types.ClientId, host_parent_surface: types.SurfaceId) !types.EmbedId {
+        return embed.embedCreate(&self.model, client_id, host_parent_surface);
+    }
+
+    pub fn embedAttachChild(self: *Engine, id: types.EmbedId, child_surface: types.SurfaceId) !void {
+        try embed.embedAttachChild(&self.model, id, child_surface);
+    }
+
+    pub fn embedSetSubsurfaceResource(self: *Engine, id: types.EmbedId, resource_id: types.ResourceId) !void {
+        try embed.embedSetSubsurfaceResource(&self.model, id, resource_id);
+    }
+
+    pub fn embedResize(self: *Engine, id: types.EmbedId, width: i32, height: i32) !void {
+        try embed.embedResize(&self.model, id, width, height);
+        try self.effects.push(.{ .embed_resized = .{ .embed_id = id, .width = width, .height = height } });
+    }
 };
 
 // ===== production code above =====

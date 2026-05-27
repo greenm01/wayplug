@@ -10,6 +10,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .link_libc = true,
     });
+    linkWayland(wayplug_mod);
 
     const lib = b.addLibrary(.{
         .linkage = .static,
@@ -22,13 +23,15 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit and C ABI smoke tests");
 
     // Unit tests: drive the in-file `test` blocks under src/.
+    const unit_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/wayplug.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    linkWayland(unit_test_mod);
     const unit_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/wayplug.zig"),
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
-        }),
+        .root_module = unit_test_mod,
     });
     test_step.dependOn(&b.addRunArtifact(unit_tests).step);
 
@@ -46,6 +49,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         });
         mod.addImport("wayplug", wayplug_mod);
+        linkWayland(mod);
         const t = b.addTest(.{ .root_module = mod });
         test_step.dependOn(&b.addRunArtifact(t).step);
     }
@@ -65,5 +69,11 @@ pub fn build(b: *std.Build) void {
     });
     c_abi_smoke.root_module.addIncludePath(b.path("include"));
     c_abi_smoke.root_module.linkLibrary(lib);
+    linkWayland(c_abi_smoke.root_module);
     test_step.dependOn(&b.addRunArtifact(c_abi_smoke).step);
+}
+
+fn linkWayland(module: *std.Build.Module) void {
+    module.linkSystemLibrary("wayland-server", .{ .use_pkg_config = .yes });
+    module.linkSystemLibrary("wayland-client", .{ .use_pkg_config = .yes });
 }

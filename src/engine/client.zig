@@ -30,9 +30,23 @@ pub fn clientCreate(
     return id;
 }
 
+pub fn clientSetWaylandHandles(
+    m: *model_mod.Model,
+    id: types.ClientId,
+    wl_client: *wls.wl_client,
+    display: *wlc.wl_display,
+) !void {
+    const c = m.clients.getMutable(id) orelse return error.UnknownClient;
+    c.wl_client = wl_client;
+    c.wl_display = display;
+    try m.client_by_wl_client.put(m.allocator, wl_client, id);
+    try m.client_by_display.put(m.allocator, display, id);
+}
+
 pub fn clientDestroy(m: *model_mod.Model, id: types.ClientId) void {
-    if (m.clients.getMutable(id)) |c| {
-        c.state = .closing;
+    if (m.clients.get(id)) |c| {
+        if (c.wl_client) |wl_client| _ = m.client_by_wl_client.swapRemove(wl_client);
+        if (c.wl_display) |display| _ = m.client_by_display.swapRemove(display);
     }
     // TODO: walk owned resources, embeds, surfaces, buffers per the
     // teardown order in docs/architecture.md § Teardown Order.

@@ -20,6 +20,7 @@ pub fn embedCreate(
         .state = .reserved,
         .host_parent_surface_id = host_parent_surface,
         .plugin_child_surface_id = .null_id,
+        .subsurface_resource_id = .null_id,
         .x = 0,
         .y = 0,
         .width = 0,
@@ -38,6 +39,15 @@ pub fn embedAttachChild(
     e.plugin_child_surface_id = child_surface;
     e.state = .child_ready;
     try m.embed_by_child_surface.put(m.allocator, child_surface, id);
+}
+
+pub fn embedSetSubsurfaceResource(
+    m: *model_mod.Model,
+    id: types.EmbedId,
+    resource_id: types.ResourceId,
+) !void {
+    const e = m.embeds.getMutable(id) orelse return error.UnknownEmbed;
+    e.subsurface_resource_id = resource_id;
 }
 
 pub fn embedResize(m: *model_mod.Model, id: types.EmbedId, width: i32, height: i32) !void {
