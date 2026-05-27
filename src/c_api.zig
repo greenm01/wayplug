@@ -69,6 +69,9 @@ pub const WayplugHostInterface = extern struct {
     on_surface_created: ?*const fn (?*anyopaque, ?*wayplug_client, ?*wlp.wl_surface) callconv(.c) void,
     on_client_closed: ?*const fn (?*anyopaque, ?*wayplug_client) callconv(.c) void,
     on_protocol_error: ?*const fn (?*anyopaque, ?*wayplug_client, u32) callconv(.c) void,
+    on_embed_mapped: ?*const fn (?*anyopaque, u32) callconv(.c) void,
+    on_embed_resized: ?*const fn (?*anyopaque, u32, i32, i32) callconv(.c) void,
+    on_embed_destroyed: ?*const fn (?*anyopaque, u32) callconv(.c) void,
 };
 
 const minimum_host_interface_size = @offsetOf(WayplugHostInterface, "userdata") +
@@ -93,6 +96,9 @@ pub fn normalizeHostInterface(host: *const WayplugHostInterface) ?WayplugHostInt
     copyHostField(&normalized, host, "on_surface_created");
     copyHostField(&normalized, host, "on_client_closed");
     copyHostField(&normalized, host, "on_protocol_error");
+    copyHostField(&normalized, host, "on_embed_mapped");
+    copyHostField(&normalized, host, "on_embed_resized");
+    copyHostField(&normalized, host, "on_embed_destroyed");
     return normalized;
 }
 
@@ -112,6 +118,9 @@ fn emptyHostInterface() WayplugHostInterface {
         .on_surface_created = null,
         .on_client_closed = null,
         .on_protocol_error = null,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = null,
     };
 }
 
@@ -335,6 +344,19 @@ test "host interface normalization accepts older append-only sizes" {
     const normalized = normalizeHostInterface(&iface).?;
     try std.testing.expectEqual(@sizeOf(WayplugHostInterface), normalized.size);
     try std.testing.expect(normalized.on_protocol_error == null);
+    try std.testing.expect(normalized.on_embed_mapped == null);
+    try std.testing.expect(normalized.on_embed_resized == null);
+    try std.testing.expect(normalized.on_embed_destroyed == null);
+}
+
+test "host interface normalization accepts pre-embed-callback sizes" {
+    var iface = emptyHostInterface();
+    iface.size = @offsetOf(WayplugHostInterface, "on_embed_mapped");
+    const normalized = normalizeHostInterface(&iface).?;
+    try std.testing.expect(normalized.on_protocol_error == null);
+    try std.testing.expect(normalized.on_embed_mapped == null);
+    try std.testing.expect(normalized.on_embed_resized == null);
+    try std.testing.expect(normalized.on_embed_destroyed == null);
 }
 
 test "host interface normalization rejects too-small structs" {

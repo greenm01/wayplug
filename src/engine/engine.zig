@@ -49,6 +49,9 @@ pub const Engine = struct {
 
     pub fn clientDestroy(self: *Engine, id: types.ClientId) !void {
         if (!self.model.clients.contains(id)) return;
+        for (self.model.embeds.items()) |record| {
+            if (record.client_id == id) try self.effects.push(.{ .embed_destroyed = record.id });
+        }
         client.clientDestroy(&self.model, id);
         try self.effects.push(.{ .client_closed = id });
     }
@@ -107,9 +110,20 @@ pub const Engine = struct {
         try embed.embedSetSubsurfaceResource(&self.model, id, resource_id);
     }
 
+    pub fn embedMap(self: *Engine, id: types.EmbedId) !void {
+        try embed.embedMap(&self.model, id);
+        try self.effects.push(.{ .embed_mapped = id });
+    }
+
     pub fn embedResize(self: *Engine, id: types.EmbedId, width: i32, height: i32) !void {
         try embed.embedResize(&self.model, id, width, height);
         try self.effects.push(.{ .embed_resized = .{ .embed_id = id, .width = width, .height = height } });
+    }
+
+    pub fn embedDestroy(self: *Engine, id: types.EmbedId) !void {
+        if (!self.model.embeds.contains(id)) return;
+        embed.embedDestroy(&self.model, id);
+        try self.effects.push(.{ .embed_destroyed = id });
     }
 };
 

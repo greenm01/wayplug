@@ -76,6 +76,8 @@ const HostSmokeState = struct {
     parent_surface: ?*wlp.wl_surface = null,
     surface_created_count: std.atomic.Value(u32) = .init(0),
     embed_attached: std.atomic.Value(bool) = .init(false),
+    embed_mapped_count: std.atomic.Value(u32) = .init(0),
+    embed_resized_count: std.atomic.Value(u32) = .init(0),
 };
 
 const ServerThreadContext = struct {
@@ -175,6 +177,23 @@ fn hostSurfaceCreated(
     _ = state.surface_created_count.fetchAdd(1, .acq_rel);
 }
 
+fn hostEmbedMapped(userdata: ?*anyopaque, embed_id: u32) callconv(.c) void {
+    if (embed_id == 0) return;
+    const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return));
+    _ = state.embed_mapped_count.fetchAdd(1, .acq_rel);
+}
+
+fn hostEmbedResized(
+    userdata: ?*anyopaque,
+    embed_id: u32,
+    width: i32,
+    height: i32,
+) callconv(.c) void {
+    if (embed_id == 0 or width != 64 or height != 48) return;
+    const state: *HostSmokeState = @ptrCast(@alignCast(userdata orelse return));
+    _ = state.embed_resized_count.fetchAdd(1, .acq_rel);
+}
+
 test "weston headless smoke forwards create attach commit and embed" {
     if (builtin.os.tag != .linux) return error.SkipZigTest;
 
@@ -254,6 +273,9 @@ test "weston headless smoke forwards create attach commit and embed" {
         .on_surface_created = hostSurfaceCreated,
         .on_client_closed = null,
         .on_protocol_error = null,
+        .on_embed_mapped = hostEmbedMapped,
+        .on_embed_resized = hostEmbedResized,
+        .on_embed_destroyed = null,
     };
     const server = try wayplug.server.Server.create(allocator, &iface, null);
     defer server.destroy();
@@ -280,6 +302,7 @@ test "weston headless smoke forwards create attach commit and embed" {
     try flushDisplay(plugin_display);
     try std.testing.expect(server.embedResize(server.client_handles.items[0], 64, 48));
     try roundtripDisplay(plugin_display);
+    try waitForEmbedCallbacks(&host_state);
 
     thread_context.running.store(false, .release);
     server_thread.?.join();
@@ -288,6 +311,8 @@ test "weston headless smoke forwards create attach commit and embed" {
 
     try std.testing.expectEqual(@as(u32, 1), host_state.surface_created_count.load(.acquire));
     try std.testing.expect(host_state.embed_attached.load(.acquire));
+    try std.testing.expectEqual(@as(u32, 1), host_state.embed_mapped_count.load(.acquire));
+    try std.testing.expectEqual(@as(u32, 1), host_state.embed_resized_count.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), server.engine.model.embeds.count());
     try std.testing.expectEqual(@as(usize, 2), server.engine.model.surfaces.count());
     try std.testing.expectEqual(@as(usize, 1), server.engine.model.buffers.count());
@@ -336,6 +361,18 @@ fn waitForSurfaceCreated(state: *const HostSmokeState) !void {
         sleepMs(10);
     }
     return error.SurfaceCreatedTimedOut;
+}
+
+fn waitForEmbedCallbacks(state: *const HostSmokeState) !void {
+    for (0..200) |_| {
+        if (state.embed_mapped_count.load(.acquire) > 0 and
+            state.embed_resized_count.load(.acquire) > 0)
+        {
+            return;
+        }
+        sleepMs(10);
+    }
+    return error.EmbedCallbacksTimedOut;
 }
 
 fn sleepMs(ms: u32) void {

@@ -56,6 +56,11 @@ pub fn embedResize(m: *model_mod.Model, id: types.EmbedId, width: i32, height: i
     e.height = height;
 }
 
+pub fn embedMap(m: *model_mod.Model, id: types.EmbedId) !void {
+    const e = m.embeds.getMutable(id) orelse return error.UnknownEmbed;
+    e.state = .mapped;
+}
+
 pub fn embedDestroy(m: *model_mod.Model, id: types.EmbedId) void {
     if (m.embeds.get(id)) |e| {
         _ = m.embed_by_parent_surface.swapRemove(e.host_parent_surface_id);
@@ -87,9 +92,10 @@ test "embed create, attach child, resize, destroy" {
     const eid = try embedCreate(&m, cid, parent);
     try embedAttachChild(&m, eid, child);
     try embedResize(&m, eid, 400, 300);
+    try embedMap(&m, eid);
 
     const e = m.embeds.get(eid).?;
-    try std.testing.expect(e.state == .child_ready);
+    try std.testing.expect(e.state == .mapped);
     try std.testing.expect(e.width == 400);
     try std.testing.expect(embedForChildSurface(&m, child).? == eid);
 

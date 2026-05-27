@@ -81,6 +81,18 @@ pub const Host = struct {
     pub fn onProtocolError(self: Host, client: ?*c_api.wayplug_client, code: u32) void {
         if (self.iface.on_protocol_error) |f| f(self.iface.userdata, client, code);
     }
+
+    pub fn onEmbedMapped(self: Host, embed_id: u32) void {
+        if (self.iface.on_embed_mapped) |f| f(self.iface.userdata, embed_id);
+    }
+
+    pub fn onEmbedResized(self: Host, embed_id: u32, width: i32, height: i32) void {
+        if (self.iface.on_embed_resized) |f| f(self.iface.userdata, embed_id, width, height);
+    }
+
+    pub fn onEmbedDestroyed(self: Host, embed_id: u32) void {
+        if (self.iface.on_embed_destroyed) |f| f(self.iface.userdata, embed_id);
+    }
 };
 
 // ===== production code above =====
@@ -101,8 +113,12 @@ test "Host wraps a null-callback interface as no-op" {
         .on_surface_created = null,
         .on_client_closed = null,
         .on_protocol_error = null,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = null,
     };
     const h = Host.init(&iface);
     try std.testing.expect(h.getCompositor() == null);
     h.onClientConnected(null); // must not crash
+    h.onEmbedMapped(1); // must not crash
 }

@@ -195,8 +195,10 @@ pub const Server = struct {
     }
 
     fn drainEffects(self: *Server) void {
-        const pending = self.engine.effects.pending();
-        for (pending) |effect| {
+        var pending = self.engine.effects.takePending();
+        defer pending.deinit(self.engine.effects.allocator);
+
+        for (pending.items) |effect| {
             switch (effect) {
                 .client_connected => |client_id| {
                     self.host.onClientConnected(opaqueClient(self.findClientHandleById(client_id)));
@@ -215,10 +217,18 @@ pub const Server = struct {
                     const handle = self.findClientHandleById(err.client_id);
                     self.host.onProtocolError(opaqueClient(handle), err.code);
                 },
+                .embed_mapped => |embed_id| {
+                    self.host.onEmbedMapped(embedIdInt(embed_id));
+                },
+                .embed_resized => |resized| {
+                    self.host.onEmbedResized(embedIdInt(resized.embed_id), resized.width, resized.height);
+                },
+                .embed_destroyed => |embed_id| {
+                    self.host.onEmbedDestroyed(embedIdInt(embed_id));
+                },
                 else => {},
             }
         }
-        self.engine.effects.clear();
     }
 
     fn freeClientHandle(self: *Server, handle: *ClientHandle) void {
@@ -347,6 +357,7 @@ pub const Server = struct {
         self.engine.embedAttachChild(embed_id, child_surface_id) catch return false;
         self.engine.embedSetSubsurfaceResource(embed_id, subsurface_resource_id) catch return false;
         self.applyEmbedOffset(handle, embed_id);
+        self.engine.embedMap(embed_id) catch return false;
         return true;
     }
 
@@ -389,6 +400,10 @@ fn opaqueClient(handle: ?*ClientHandle) ?*c_api.wayplug_client {
     return if (handle) |h| @ptrCast(h) else null;
 }
 
+fn embedIdInt(embed_id: types.EmbedId) u32 {
+    return @intFromEnum(embed_id);
+}
+
 const runtime_helpers = protocol_runtime.Helpers(Server, ResourceData);
 const registry_bindings = protocol_registry.Bindings(Server, ResourceData);
 
@@ -398,6 +413,17 @@ const ProtocolErrorTestState = struct {
     client: ?*c_api.wayplug_client = null,
     code: u32 = 0,
     calls: u32 = 0,
+};
+
+const EmbedCallbackTestState = struct {
+    mapped_id: u32 = 0,
+    resized_id: u32 = 0,
+    destroyed_id: u32 = 0,
+    width: i32 = 0,
+    height: i32 = 0,
+    mapped_calls: u32 = 0,
+    resized_calls: u32 = 0,
+    destroyed_calls: u32 = 0,
 };
 
 const RegistryTestState = struct {
@@ -440,6 +466,9 @@ fn testHostInterface(userdata: ?*anyopaque) c_api.WayplugHostInterface {
         .on_surface_created = null,
         .on_client_closed = null,
         .on_protocol_error = null,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = null,
     };
 }
 
@@ -452,6 +481,31 @@ fn recordProtocolError(
     state.client = client;
     state.code = code;
     state.calls += 1;
+}
+
+fn recordEmbedMapped(userdata: ?*anyopaque, embed_id: u32) callconv(.c) void {
+    const state: *EmbedCallbackTestState = @ptrCast(@alignCast(userdata.?));
+    state.mapped_id = embed_id;
+    state.mapped_calls += 1;
+}
+
+fn recordEmbedResized(
+    userdata: ?*anyopaque,
+    embed_id: u32,
+    width: i32,
+    height: i32,
+) callconv(.c) void {
+    const state: *EmbedCallbackTestState = @ptrCast(@alignCast(userdata.?));
+    state.resized_id = embed_id;
+    state.width = width;
+    state.height = height;
+    state.resized_calls += 1;
+}
+
+fn recordEmbedDestroyed(userdata: ?*anyopaque, embed_id: u32) callconv(.c) void {
+    const state: *EmbedCallbackTestState = @ptrCast(@alignCast(userdata.?));
+    state.destroyed_id = embed_id;
+    state.destroyed_calls += 1;
 }
 
 test "Server create and destroy is balanced" {
@@ -470,6 +524,9 @@ test "Server create and destroy is balanced" {
         .on_surface_created = null,
         .on_client_closed = null,
         .on_protocol_error = null,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = null,
     };
     const s = try Server.create(std.testing.allocator, &iface, null);
     defer s.destroy();
@@ -493,6 +550,9 @@ test "protocol_error effect drains to host callback" {
         .on_surface_created = null,
         .on_client_closed = null,
         .on_protocol_error = recordProtocolError,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = null,
     };
     const s = try Server.create(std.testing.allocator, &iface, null);
     defer s.destroy();
@@ -511,6 +571,51 @@ test "protocol_error effect drains to host callback" {
     try std.testing.expectEqual(@as(u32, 1), state.calls);
     try std.testing.expectEqual(@as(u32, 77), state.code);
     try std.testing.expect(state.client == opaqueClient(handle));
+}
+
+test "embed lifecycle effects drain to host callbacks" {
+    var state = EmbedCallbackTestState{};
+    const iface = c_api.WayplugHostInterface{
+        .size = @sizeOf(c_api.WayplugHostInterface),
+        .version = c_api.abi_version,
+        .userdata = &state,
+        .get_compositor = null,
+        .get_subcompositor = null,
+        .get_shm = null,
+        .get_seat = null,
+        .get_xdg_wm_base = null,
+        .get_dmabuf = null,
+        .get_subsurface_offset = null,
+        .on_client_connected = null,
+        .on_surface_created = null,
+        .on_client_closed = null,
+        .on_protocol_error = null,
+        .on_embed_mapped = recordEmbedMapped,
+        .on_embed_resized = recordEmbedResized,
+        .on_embed_destroyed = recordEmbedDestroyed,
+    };
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    try s.engine.effects.push(.{ .embed_mapped = @enumFromInt(9) });
+    try s.engine.effects.push(.{
+        .embed_resized = .{
+            .embed_id = @enumFromInt(9),
+            .width = 640,
+            .height = 480,
+        },
+    });
+    try s.engine.effects.push(.{ .embed_destroyed = @enumFromInt(9) });
+
+    s.dispatch();
+    try std.testing.expectEqual(@as(u32, 1), state.mapped_calls);
+    try std.testing.expectEqual(@as(u32, 1), state.resized_calls);
+    try std.testing.expectEqual(@as(u32, 1), state.destroyed_calls);
+    try std.testing.expectEqual(@as(u32, 9), state.mapped_id);
+    try std.testing.expectEqual(@as(u32, 9), state.resized_id);
+    try std.testing.expectEqual(@as(u32, 9), state.destroyed_id);
+    try std.testing.expectEqual(@as(i32, 640), state.width);
+    try std.testing.expectEqual(@as(i32, 480), state.height);
 }
 
 test "server registers only host-supplied globals" {

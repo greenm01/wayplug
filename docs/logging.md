@@ -54,6 +54,29 @@ Registry bind validation uses this path too: invalid global bind versions
 surface as `WL_DISPLAY_ERROR_INVALID_METHOD`, and unexpected missing host
 objects during bind surface as `WL_DISPLAY_ERROR_IMPLEMENTATION`.
 
+```c
+void (*on_embed_mapped)(void *userdata, uint32_t embed_id);
+```
+
+Fires after `wayplug_embed_attach` establishes the parent/child/subsurface
+relationship. `embed_id` is stable for the server lifetime and is not reused.
+
+```c
+void (*on_embed_resized)(void *userdata,
+                         uint32_t embed_id,
+                         int32_t width,
+                         int32_t height);
+```
+
+Fires when `wayplug_embed_resize` updates an existing embed.
+
+```c
+void (*on_embed_destroyed)(void *userdata, uint32_t embed_id);
+```
+
+Fires before the owning client's `on_client_closed` callback when teardown
+destroys that client's embeds.
+
 ### Constraints
 
 - Callbacks return `void`. They report; they do not gate. Policy decisions
@@ -132,7 +155,7 @@ The surface pointer in `on_surface_created` is a host-compositor handle —
 it is stable for protocol use but should not be the primary log key since
 it is not exposed by other callbacks. Use `client` as the correlation key.
 
-## Planned Diagnostics Expansion
+## Diagnostics Effect Surface
 
 The internal effect queue (see [DOD § Effects](dod.md#effects)) already
 tracks embed lifecycle and diagnostics:
@@ -145,17 +168,9 @@ protocol_error(client_id, code)
 diagnostics_dirty
 ```
 
-`protocol_error` is surfaced through `on_protocol_error`. The remaining
-effects are not yet exposed as callbacks. When they are added, the callback
-struct gains:
-
-- `on_embed_mapped` / `on_embed_resized` / `on_embed_destroyed` — embed
-  lifecycle, keyed on embed id (a stable `uint32_t` that is not reused in a
-  server's lifetime)
-
-Until then, embed evidence must be gathered from `on_client_closed` (all
-embeds for a client are torn down before this fires) or from internal
-Zig-side state during development.
+`protocol_error` is surfaced through `on_protocol_error`. Embed lifecycle
+effects are surfaced through the embed callbacks, keyed on embed id (a stable
+`uint32_t` that is not reused in a server's lifetime).
 
 ## Developer and Agent Debugging Evidence
 
@@ -173,9 +188,9 @@ record-level snapshot iteration lands.
 cross-run key. It is the anchor that ties connect, surface-created, and close
 events together.
 
-**Embed ids** — when embed callbacks land, embed ids (`uint32_t`) will be
-the stable key for the embed's full lifecycle (mapped → resized → destroyed).
-Record these alongside the client handle.
+**Embed ids** — embed ids (`uint32_t`) are the stable key for the embed's
+full lifecycle (mapped → resized → destroyed). Record these alongside the
+client handle.
 
 **Protocol error records** — `on_protocol_error` carries the client handle
 and Wayland error code. Log both so protocol failures can be correlated with

@@ -5,6 +5,9 @@
 
 static int connected_count = 0;
 static int closed_count = 0;
+static int mapped_count = 0;
+static int resized_count = 0;
+static int destroyed_count = 0;
 static wayplug_client *last_client = NULL;
 
 static int snapshot_clients(wayplug_snapshot *snapshot, size_t *clients)
@@ -42,6 +45,33 @@ static void on_client_closed(void *userdata, wayplug_client *client)
     }
 }
 
+static void on_embed_mapped(void *userdata, uint32_t embed_id)
+{
+    (void)userdata;
+    if (embed_id != 0) {
+        mapped_count += 1;
+    }
+}
+
+static void on_embed_resized(void *userdata,
+                             uint32_t embed_id,
+                             int32_t width,
+                             int32_t height)
+{
+    (void)userdata;
+    if (embed_id != 0 && width >= 0 && height >= 0) {
+        resized_count += 1;
+    }
+}
+
+static void on_embed_destroyed(void *userdata, uint32_t embed_id)
+{
+    (void)userdata;
+    if (embed_id != 0) {
+        destroyed_count += 1;
+    }
+}
+
 int main(void)
 {
     if (wayplug_abi_version() != WAYPLUG_ABI_VERSION) {
@@ -71,6 +101,9 @@ int main(void)
     host.on_surface_created = NULL;
     host.on_client_closed = on_client_closed;
     host.on_protocol_error = NULL;
+    host.on_embed_mapped = on_embed_mapped;
+    host.on_embed_resized = on_embed_resized;
+    host.on_embed_destroyed = on_embed_destroyed;
 
     wayplug_server *server = wayplug_server_create(&host, NULL);
     if (server == NULL) {
@@ -148,27 +181,32 @@ int main(void)
         wayplug_server_destroy(server);
         return 16;
     }
+    if (mapped_count != 0 || resized_count != 0 || destroyed_count != 0) {
+        wayplug_snapshot_free(open_snapshot);
+        wayplug_server_destroy(server);
+        return 17;
+    }
 
     size_t still_open_clients = 0;
     if (!snapshot_clients(open_snapshot, &still_open_clients) ||
         still_open_clients != 1) {
         wayplug_snapshot_free(open_snapshot);
         wayplug_server_destroy(server);
-        return 17;
+        return 18;
     }
     wayplug_snapshot_free(open_snapshot);
 
     wayplug_snapshot *closed_snapshot = wayplug_server_snapshot(server);
     if (closed_snapshot == NULL) {
         wayplug_server_destroy(server);
-        return 18;
+        return 19;
     }
     size_t closed_clients = 99;
     if (!snapshot_clients(closed_snapshot, &closed_clients) ||
         closed_clients != 0) {
         wayplug_snapshot_free(closed_snapshot);
         wayplug_server_destroy(server);
-        return 19;
+        return 20;
     }
     wayplug_snapshot_free(closed_snapshot);
 

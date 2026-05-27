@@ -54,6 +54,28 @@ test "effect queue retains append order until cleared" {
     try std.testing.expectEqual(@as(usize, 0), q.count());
 }
 
+test "embed map and resize queue lifecycle effects" {
+    var engine = wayplug.engine.Engine.init(std.testing.allocator);
+    defer engine.deinit();
+
+    const cid = try engine.clientCreate(-1, -1);
+    const parent_rid = try engine.resourceCreate(cid, .surface, null, fakeProxy(0x1000));
+    const parent_sid = try engine.surfaceCreate(cid, parent_rid);
+    const embed_id = try engine.embedCreate(cid, parent_sid);
+    engine.effects.clear();
+
+    try engine.embedMap(embed_id);
+    try engine.embedResize(embed_id, 320, 240);
+
+    try std.testing.expectEqual(@as(usize, 2), engine.effects.count());
+    try std.testing.expectEqual(embed_id, engine.effects.pending()[0].embed_mapped);
+    const resized = engine.effects.pending()[1].embed_resized;
+    try std.testing.expectEqual(embed_id, resized.embed_id);
+    try std.testing.expectEqual(@as(i32, 320), resized.width);
+    try std.testing.expectEqual(@as(i32, 240), resized.height);
+    try std.testing.expect(engine.model.embeds.get(embed_id).?.state == .mapped);
+}
+
 test "clientDestroy tears down owned embed graph and indexes before client_closed effect" {
     var engine = wayplug.engine.Engine.init(std.testing.allocator);
     defer engine.deinit();
@@ -102,8 +124,9 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
     try std.testing.expect(engine.model.buffer_by_resource.get(buffer_rid) == null);
     try std.testing.expect(engine.model.embed_by_child_surface.get(child_sid) == null);
     try std.testing.expect(engine.model.embed_by_parent_surface.get(parent_sid) == null);
-    try std.testing.expectEqual(@as(usize, 1), engine.effects.count());
-    try std.testing.expectEqual(cid, engine.effects.pending()[0].client_closed);
+    try std.testing.expectEqual(@as(usize, 2), engine.effects.count());
+    try std.testing.expectEqual(embed_id, engine.effects.pending()[0].embed_destroyed);
+    try std.testing.expectEqual(cid, engine.effects.pending()[1].client_closed);
 }
 
 test "clientDestroy preserves records owned by other clients" {

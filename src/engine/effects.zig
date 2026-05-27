@@ -39,6 +39,14 @@ pub const Queue = struct {
         return self.items.items;
     }
 
+    /// Move the current queue out for draining. Effects pushed while
+    /// the returned list is processed remain queued for a later drain.
+    pub fn takePending(self: *Queue) std.ArrayListUnmanaged(Effect) {
+        const pending_items = self.items;
+        self.items = .empty;
+        return pending_items;
+    }
+
     pub fn clear(self: *Queue) void {
         self.items.clearRetainingCapacity();
     }
@@ -56,4 +64,19 @@ test "push and drain preserve order" {
     try q.push(.{ .client_connected = @enumFromInt(1) });
     try q.push(.diagnostics_dirty);
     try std.testing.expectEqual(@as(usize, 2), q.count());
+}
+
+test "takePending detaches current queue" {
+    var q = Queue.init(std.testing.allocator);
+    defer q.deinit();
+
+    try q.push(.{ .client_connected = @enumFromInt(1) });
+    var pending_items = q.takePending();
+    defer pending_items.deinit(std.testing.allocator);
+    try q.push(.{ .client_closed = @enumFromInt(2) });
+
+    try std.testing.expectEqual(@as(usize, 1), pending_items.items.len);
+    try std.testing.expect(pending_items.items[0] == .client_connected);
+    try std.testing.expectEqual(@as(usize, 1), q.count());
+    try std.testing.expect(q.pending()[0] == .client_closed);
 }
