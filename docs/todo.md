@@ -71,13 +71,11 @@ delegated server and asserts model state plus Wayland error-free delivery.
 
 ## Engine maturation
 
-### Dense `EntityManager` storage
+### ~~Dense `EntityManager` storage~~
 
-Replace the `AutoArrayHashMapUnmanaged` backing with a dense
-`ArrayList(V)` plus a sparse id → index map. Logical ids stay stable;
-delete uses swap-and-pop per [dod.md](dod.md) § Entity Manager. Land
-this after the first delegates work; doing it earlier optimizes a path
-that no benchmark has yet pointed at.
+Done: `EntityManager` now uses dense record storage plus a sparse
+id-to-index map. Logical ids stay stable, insert replacement preserves
+counts, and delete uses swap-and-pop while updating moved-record lookup.
 
 ### ~~Effect queue drain in `dispatch()`~~
 

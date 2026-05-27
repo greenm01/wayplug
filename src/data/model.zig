@@ -9,49 +9,79 @@ const types = @import("types.zig");
 const wlc = @import("../wayland/client.zig");
 const wls = @import("../wayland/server.zig");
 
-/// Dense-ish entity manager. Backed by an array hash map keyed on the
-/// logical id. Provides the low-level CRUD documented in
-/// docs/dod.md § Entity Manager. Real dense storage with swap-and-pop
-/// can replace this without changing callers.
+/// Dense entity manager. Stores records contiguously while a sparse
+/// id-to-index map keeps logical ids stable across swap-and-pop deletes.
 pub fn EntityManager(comptime K: type, comptime V: type) type {
+    comptime {
+        if (!@hasField(V, "id")) {
+            @compileError("EntityManager record type must have an id field");
+        }
+        if (@TypeOf(@as(V, undefined).id) != K) {
+            @compileError("EntityManager record id field must match key type");
+        }
+    }
+
     return struct {
         const Self = @This();
-        const Map = std.AutoArrayHashMapUnmanaged(K, V);
 
-        records: Map = .empty,
+        records: std.ArrayListUnmanaged(V) = .empty,
+        index_by_id: std.AutoArrayHashMapUnmanaged(K, usize) = .empty,
 
         pub const empty: Self = .{};
 
         pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
             self.records.deinit(allocator);
+            self.index_by_id.deinit(allocator);
         }
 
         pub fn insert(self: *Self, allocator: std.mem.Allocator, key: K, value: V) !void {
-            try self.records.put(allocator, key, value);
+            std.debug.assert(value.id == key);
+
+            if (self.index_by_id.get(key)) |index| {
+                self.records.items[index] = value;
+                return;
+            }
+
+            const index = self.records.items.len;
+            try self.records.append(allocator, value);
+            errdefer _ = self.records.pop();
+            try self.index_by_id.put(allocator, key, index);
         }
 
         pub fn delete(self: *Self, key: K) bool {
-            return self.records.swapRemove(key);
+            const index = self.index_by_id.get(key) orelse return false;
+            const last_index = self.records.items.len - 1;
+
+            _ = self.index_by_id.swapRemove(key);
+            if (index != last_index) {
+                const moved = self.records.items[last_index];
+                self.records.items[index] = moved;
+                self.index_by_id.getPtr(moved.id).?.* = index;
+            }
+            _ = self.records.pop();
+            return true;
         }
 
         pub fn contains(self: *const Self, key: K) bool {
-            return self.records.contains(key);
+            return self.index_by_id.contains(key);
         }
 
         pub fn get(self: *const Self, key: K) ?V {
-            return self.records.get(key);
+            const index = self.index_by_id.get(key) orelse return null;
+            return self.records.items[index];
         }
 
         pub fn getMutable(self: *Self, key: K) ?*V {
-            return self.records.getPtr(key);
+            const index = self.index_by_id.get(key) orelse return null;
+            return &self.records.items[index];
         }
 
-        pub fn items(self: *const Self) []V {
-            return self.records.values();
+        pub fn items(self: *const Self) []const V {
+            return self.records.items;
         }
 
         pub fn count(self: *const Self) usize {
-            return self.records.count();
+            return self.records.items.len;
         }
     };
 }
@@ -173,4 +203,104 @@ test "EntityManager insert/get/delete round-trip" {
 
     try std.testing.expect(model.clients.delete(id));
     try std.testing.expect(!model.clients.contains(id));
+}
+
+test "EntityManager replace keeps stable count" {
+    var model = Model.init(std.testing.allocator);
+    defer model.deinit();
+
+    const id = try model.nextClientId();
+    try model.clients.insert(model.allocator, id, .{
+        .id = id,
+        .state = .connected,
+        .server_fd = -1,
+        .client_fd = -1,
+        .wl_client = null,
+        .wl_display = null,
+    });
+    try model.clients.insert(model.allocator, id, .{
+        .id = id,
+        .state = .closing,
+        .server_fd = -1,
+        .client_fd = -1,
+        .wl_client = null,
+        .wl_display = null,
+    });
+
+    try std.testing.expectEqual(@as(usize, 1), model.clients.count());
+    try std.testing.expect(model.clients.get(id).?.state == .closing);
+}
+
+test "EntityManager delete swaps last record and updates sparse index" {
+    var model = Model.init(std.testing.allocator);
+    defer model.deinit();
+
+    const id1 = try model.nextClientId();
+    const id2 = try model.nextClientId();
+    const id3 = try model.nextClientId();
+
+    try model.clients.insert(model.allocator, id1, .{
+        .id = id1,
+        .state = .connected,
+        .server_fd = -1,
+        .client_fd = -1,
+        .wl_client = null,
+        .wl_display = null,
+    });
+    try model.clients.insert(model.allocator, id2, .{
+        .id = id2,
+        .state = .connected,
+        .server_fd = -1,
+        .client_fd = -1,
+        .wl_client = null,
+        .wl_display = null,
+    });
+    try model.clients.insert(model.allocator, id3, .{
+        .id = id3,
+        .state = .closing,
+        .server_fd = -1,
+        .client_fd = -1,
+        .wl_client = null,
+        .wl_display = null,
+    });
+
+    try std.testing.expect(model.clients.delete(id2));
+    try std.testing.expectEqual(@as(usize, 2), model.clients.count());
+    try std.testing.expect(!model.clients.contains(id2));
+    try std.testing.expect(model.clients.get(id3).?.state == .closing);
+
+    const moved = model.clients.getMutable(id3).?;
+    moved.state = .dead;
+    try std.testing.expect(model.clients.get(id3).?.state == .dead);
+}
+
+test "EntityManager delete last record clears lookup" {
+    var model = Model.init(std.testing.allocator);
+    defer model.deinit();
+
+    const id1 = try model.nextClientId();
+    const id2 = try model.nextClientId();
+
+    try model.clients.insert(model.allocator, id1, .{
+        .id = id1,
+        .state = .connected,
+        .server_fd = -1,
+        .client_fd = -1,
+        .wl_client = null,
+        .wl_display = null,
+    });
+    try model.clients.insert(model.allocator, id2, .{
+        .id = id2,
+        .state = .closing,
+        .server_fd = -1,
+        .client_fd = -1,
+        .wl_client = null,
+        .wl_display = null,
+    });
+
+    try std.testing.expect(model.clients.delete(id2));
+    try std.testing.expect(!model.clients.contains(id2));
+    try std.testing.expect(model.clients.contains(id1));
+    try std.testing.expect(model.clients.delete(id1));
+    try std.testing.expectEqual(@as(usize, 0), model.clients.count());
 }
