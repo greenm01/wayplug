@@ -417,7 +417,14 @@ pub const Server = struct {
 
     pub fn protocolErrorForClient(self: *Server, client: *wls.wl_client, code: u32) void {
         const client_id = self.clientIdForWlClient(client) orelse return;
+        self.fatalProtocolError(client_id, code);
+    }
+
+    pub fn fatalProtocolError(self: *Server, client_id: types.ClientId, code: u32) void {
+        const handle = self.findClientHandleById(client_id) orelse return;
+        if (handle.close_pending) return;
         self.engine.protocolError(client_id, code) catch {};
+        self.closeClientHandle(handle, true);
     }
 
     pub fn createResource(
@@ -755,6 +762,19 @@ const ProtocolErrorTestState = struct {
     calls: u32 = 0,
 };
 
+const LifecycleOrderTestState = struct {
+    order: [3]u8 = .{ 0, 0, 0 },
+    calls: u32 = 0,
+    protocol_code: u32 = 0,
+    embed_id: u32 = 0,
+    client: ?*c_api.wayembed_client = null,
+
+    fn record(self: *LifecycleOrderTestState, marker: u8) void {
+        if (self.calls < self.order.len) self.order[self.calls] = marker;
+        self.calls += 1;
+    }
+};
+
 const EmbedCallbackTestState = struct {
     mapped_id: u32 = 0,
     resized_id: u32 = 0,
@@ -867,6 +887,29 @@ fn recordProtocolError(
     state.client = client;
     state.code = code;
     state.calls += 1;
+}
+
+fn recordLifecycleProtocolError(
+    userdata: ?*anyopaque,
+    client: ?*c_api.wayembed_client,
+    code: u32,
+) callconv(.c) void {
+    const state: *LifecycleOrderTestState = @ptrCast(@alignCast(userdata.?));
+    state.record('P');
+    state.client = client;
+    state.protocol_code = code;
+}
+
+fn recordLifecycleClientClosed(userdata: ?*anyopaque, client: ?*c_api.wayembed_client) callconv(.c) void {
+    const state: *LifecycleOrderTestState = @ptrCast(@alignCast(userdata.?));
+    state.record('C');
+    state.client = client;
+}
+
+fn recordLifecycleEmbedDestroyed(userdata: ?*anyopaque, embed: ?*c_api.wayembed_embed) callconv(.c) void {
+    const state: *LifecycleOrderTestState = @ptrCast(@alignCast(userdata.?));
+    state.record('E');
+    state.embed_id = c_api.wayembed_embed_id(embed);
 }
 
 fn recordEmbedMapped(userdata: ?*anyopaque, embed: ?*c_api.wayembed_embed) callconv(.c) void {
@@ -1018,6 +1061,75 @@ test "recursive dispatch is ignored" {
     s.dispatch();
     try std.testing.expectEqual(@as(u32, 1), state.calls);
     try std.testing.expectEqual(@as(u32, 91), state.code);
+}
+
+test "fatal protocol error drains before embed and client teardown callbacks" {
+    var state = LifecycleOrderTestState{};
+    const iface = c_api.WayembedHostInterface{
+        .size = @sizeOf(c_api.WayembedHostInterface),
+        .version = c_api.abi_version,
+        .userdata = &state,
+        .get_compositor = null,
+        .get_subcompositor = null,
+        .get_shm = null,
+        .get_seat = null,
+        .get_xdg_wm_base = null,
+        .get_dmabuf = null,
+        .get_seat_capabilities = null,
+        .get_seat_name = null,
+        .get_output_info = null,
+        .get_subsurface_offset = null,
+        .on_client_connected = null,
+        .on_surface_created = null,
+        .on_client_closed = recordLifecycleClientClosed,
+        .on_protocol_error = recordLifecycleProtocolError,
+        .on_embed_mapped = null,
+        .on_embed_resized = null,
+        .on_embed_destroyed = recordLifecycleEmbedDestroyed,
+    };
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    _ = s.openClientDisplay() orelse return error.OpenClientDisplayFailed;
+    const handle = s.client_handles.items[0];
+    const client_id = handle.client_id;
+    const parent_resource_id = try s.engine.resourceCreate(client_id, .surface, null, null);
+    const parent_surface_id = try s.engine.surfaceCreate(client_id, parent_resource_id);
+    const child_resource_id = try s.engine.resourceCreate(client_id, .surface, null, null);
+    const child_surface_id = try s.engine.surfaceCreate(client_id, child_resource_id);
+    const embed_id = try s.engine.embedCreate(client_id, parent_surface_id);
+    try s.engine.embedAttachChild(embed_id, child_surface_id);
+
+    const embed_handle = try s.allocator.create(EmbedHandle);
+    embed_handle.* = .{
+        .server = s,
+        .embed_id = embed_id,
+        .client_id = client_id,
+    };
+    try s.embed_handles.append(s.allocator, embed_handle);
+    s.engine.effects.clear();
+
+    s.protocolErrorForClient(handle.wl_client.?, 123);
+    s.fatalProtocolError(client_id, 124);
+
+    try std.testing.expect(handle.close_pending);
+    try std.testing.expect(!s.engine.model.clients.contains(client_id));
+    try std.testing.expect(!s.engine.model.embeds.contains(embed_id));
+    try std.testing.expectEqual(@as(usize, 3), s.engine.effects.count());
+    const pending = s.engine.effects.pending();
+    try std.testing.expectEqual(@as(u32, 123), pending[0].protocol_error.code);
+    try std.testing.expectEqual(embed_id, pending[1].embed_destroyed);
+    try std.testing.expectEqual(client_id, pending[2].client_closed);
+    try std.testing.expect(@import("data/invariants.zig").check(&s.engine.model).ok());
+
+    s.dispatch();
+
+    try std.testing.expectEqual(@as(u32, 3), state.calls);
+    try std.testing.expectEqual(@as([3]u8, .{ 'P', 'E', 'C' }), state.order);
+    try std.testing.expectEqual(@as(u32, 123), state.protocol_code);
+    try std.testing.expectEqual(@intFromEnum(embed_id), state.embed_id);
+    try std.testing.expectEqual(@as(usize, 0), s.client_handles.items.len);
+    try std.testing.expectEqual(@as(usize, 0), s.embed_handles.items.len);
 }
 
 test "embedded coordinate translation subtracts host subsurface offset" {
@@ -1360,10 +1472,13 @@ test "invalid registry bind queues protocol error without resource" {
     registry_bindings.bindCompositor(handle.wl_client, s, 5, 2);
 
     try std.testing.expectEqual(@as(usize, 0), s.engine.model.resources.count());
-    try std.testing.expectEqual(@as(usize, 1), s.engine.effects.count());
-    const effect = s.engine.effects.pending()[0];
-    try std.testing.expectEqual(@as(u32, @intCast(wls.c.WL_DISPLAY_ERROR_INVALID_METHOD)), effect.protocol_error.code);
-    try std.testing.expectEqual(handle.client_id, effect.protocol_error.client_id);
+    try std.testing.expect(handle.close_pending);
+    try std.testing.expect(!s.engine.model.clients.contains(handle.client_id));
+    try std.testing.expectEqual(@as(usize, 2), s.engine.effects.count());
+    const pending = s.engine.effects.pending();
+    try std.testing.expectEqual(@as(u32, @intCast(wls.c.WL_DISPLAY_ERROR_INVALID_METHOD)), pending[0].protocol_error.code);
+    try std.testing.expectEqual(handle.client_id, pending[0].protocol_error.client_id);
+    try std.testing.expectEqual(handle.client_id, pending[1].client_closed);
 }
 
 test "missing host object at registry bind queues implementation error" {
@@ -1381,8 +1496,11 @@ test "missing host object at registry bind queues implementation error" {
     registry_bindings.bindCompositor(handle.wl_client, s, 1, 2);
 
     try std.testing.expectEqual(@as(usize, 0), s.engine.model.resources.count());
-    try std.testing.expectEqual(@as(usize, 1), s.engine.effects.count());
-    const effect = s.engine.effects.pending()[0];
-    try std.testing.expectEqual(@as(u32, @intCast(wls.c.WL_DISPLAY_ERROR_IMPLEMENTATION)), effect.protocol_error.code);
-    try std.testing.expectEqual(handle.client_id, effect.protocol_error.client_id);
+    try std.testing.expect(handle.close_pending);
+    try std.testing.expect(!s.engine.model.clients.contains(handle.client_id));
+    try std.testing.expectEqual(@as(usize, 2), s.engine.effects.count());
+    const pending = s.engine.effects.pending();
+    try std.testing.expectEqual(@as(u32, @intCast(wls.c.WL_DISPLAY_ERROR_IMPLEMENTATION)), pending[0].protocol_error.code);
+    try std.testing.expectEqual(handle.client_id, pending[0].protocol_error.client_id);
+    try std.testing.expectEqual(handle.client_id, pending[1].client_closed);
 }

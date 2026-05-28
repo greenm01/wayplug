@@ -116,7 +116,7 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
                     "wl_surface already has a role",
                 );
             }
-            data.server.engine.protocolError(data.client_id, @intCast(xdgs.c.XDG_WM_BASE_ERROR_ROLE)) catch {};
+            data.server.fatalProtocolError(data.client_id, @intCast(xdgs.c.XDG_WM_BASE_ERROR_ROLE));
         }
 
         fn dataFromListener(userdata: ?*anyopaque) ?*ResourceData {

@@ -32,11 +32,24 @@ Next work:
 
 ## Phase 4: Performance and Completeness
 
-- Add Linux dmabuf after the shm path and embed lifecycle stay stable.
-- Add fractional scale and viewporter support if real plugin UIs need them.
-- Add stronger lifecycle validation around partially-created and closing
-  clients.
-- Add fuzz and protocol-error tests where they catch real delegate mistakes.
+Build Phase 4 in dependency order:
+
+- Harden lifecycle validation first. Cover partially-created resources,
+  already-closing clients, protocol-error teardown, callback ordering, and
+  model invariants. Acceptance: tests prove invalid or repeated teardown does
+  not leak handles, double-fire callbacks, or leave stale indexes.
+- Add protocol-error tests for malformed requests and invalid object-state
+  transitions. Acceptance: delegates report the protocol error, close or mark
+  the client consistently, and preserve teardown ordering.
+- Add a targeted fuzz harness after lifecycle behavior is stable. Focus it on
+  delegate request sequences and model operations that own cleanup. Acceptance:
+  fuzz failures produce reproducible protocol/error traces.
+- Add fractional scale and viewporter support only when real plugin UI behavior
+  needs it. Acceptance: embedded geometry, output scale, and buffer scale stay
+  coherent across host and plugin surfaces.
+- Add Linux dmabuf after shm and lifecycle paths stay solid. Acceptance:
+  dmabuf globals and buffers forward without changing the existing shm path or
+  core format-neutral API shape.
 
 ## Deferred
 

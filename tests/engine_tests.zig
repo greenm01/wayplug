@@ -90,10 +90,12 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
     const callback_rid = try engine.resourceCreate(cid, .callback, null, fakeProxy(0x7000));
     const region_rid = try engine.resourceCreate(cid, .region, null, fakeProxy(0x8000));
     const touch_rid = try engine.resourceCreate(cid, .touch, null, fakeProxy(0x9000));
+    const output_rid = try engine.resourceCreate(cid, .output, null, fakeProxy(0xa000));
 
     const parent_sid = try engine.surfaceCreate(cid, parent_rid);
     const child_sid = try engine.surfaceCreate(cid, child_rid);
     const buffer_id = try wayembed.engine.buffer.bufferCreate(&engine.model, cid, buffer_rid);
+    const output_id = try engine.outputCreate(output_rid, 1);
     const embed_id = try engine.embedCreate(cid, parent_sid);
     try engine.embedAttachChild(embed_id, child_sid);
     try engine.embedSetSubsurfaceResource(embed_id, subsurface_rid);
@@ -102,6 +104,7 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
     try std.testing.expect(engine.model.resource_by_upstream_proxy.get(fakeProxy(0x5000)).? == subsurface_rid);
     try std.testing.expect(engine.model.surface_by_resource.get(child_rid).? == child_sid);
     try std.testing.expect(engine.model.buffer_by_resource.get(buffer_rid).? == buffer_id);
+    try std.testing.expect(engine.model.outputs.contains(output_id));
     try std.testing.expect(engine.model.embed_by_child_surface.get(child_sid).? == embed_id);
     engine.effects.clear();
 
@@ -119,6 +122,8 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
     try std.testing.expect(!engine.model.resources.contains(callback_rid));
     try std.testing.expect(!engine.model.resources.contains(region_rid));
     try std.testing.expect(!engine.model.resources.contains(touch_rid));
+    try std.testing.expect(!engine.model.resources.contains(output_rid));
+    try std.testing.expect(!engine.model.outputs.contains(output_id));
     try std.testing.expect(engine.model.client_by_wl_client.get(fakeWlClient(0x1000)) == null);
     try std.testing.expect(engine.model.client_by_display.get(fakeDisplay(0x2000)) == null);
     try std.testing.expect(engine.model.resource_by_upstream_proxy.get(fakeProxy(0x5000)) == null);
@@ -129,6 +134,7 @@ test "clientDestroy tears down owned embed graph and indexes before client_close
     try std.testing.expectEqual(@as(usize, 2), engine.effects.count());
     try std.testing.expectEqual(embed_id, engine.effects.pending()[0].embed_destroyed);
     try std.testing.expectEqual(cid, engine.effects.pending()[1].client_closed);
+    try std.testing.expect(wayembed.data.invariants.check(&engine.model).ok());
 }
 
 test "clientDestroy preserves records owned by other clients" {
@@ -159,4 +165,60 @@ test "clientDestroy preserves records owned by other clients" {
     try std.testing.expect(engine.model.resource_by_upstream_proxy.get(fakeProxy(0xe000)).? == kept_resource);
     try std.testing.expect(engine.model.surface_by_resource.get(kept_resource).? == kept_surface);
     try std.testing.expectEqual(doomed, engine.effects.pending()[0].client_closed);
+    try std.testing.expect(wayembed.data.invariants.check(&engine.model).ok());
+}
+
+test "repeated destroys are no-ops after first cleanup" {
+    var engine = wayembed.engine.Engine.init(std.testing.allocator);
+    defer engine.deinit();
+
+    const cid = try engine.clientCreate(-1, -1);
+    const resource_id = try engine.resourceCreate(cid, .surface, null, fakeProxy(0xf000));
+    const surface_id = try engine.surfaceCreate(cid, resource_id);
+    const embed_id = try engine.embedCreate(cid, surface_id);
+    engine.effects.clear();
+
+    try engine.embedDestroy(embed_id);
+    try engine.clientDestroy(cid);
+    const effect_count = engine.effects.count();
+
+    try engine.embedDestroy(embed_id);
+    try engine.clientDestroy(cid);
+    engine.resourceDestroy(resource_id);
+    wayembed.engine.surface.surfaceDestroy(&engine.model, surface_id);
+
+    try std.testing.expectEqual(effect_count, engine.effects.count());
+    try std.testing.expect(!engine.model.clients.contains(cid));
+    try std.testing.expect(!engine.model.embeds.contains(embed_id));
+    try std.testing.expect(!engine.model.resources.contains(resource_id));
+    try std.testing.expect(!engine.model.surfaces.contains(surface_id));
+    try std.testing.expect(wayembed.data.invariants.check(&engine.model).ok());
+}
+
+test "clientDestroy handles partial lifecycle graphs" {
+    var engine = wayembed.engine.Engine.init(std.testing.allocator);
+    defer engine.deinit();
+
+    const resource_only_client = try engine.clientCreate(-1, -1);
+    const resource_only = try engine.resourceCreate(resource_only_client, .region, null, fakeProxy(0x10000));
+
+    const surface_only_client = try engine.clientCreate(-1, -1);
+    const surface_resource = try engine.resourceCreate(surface_only_client, .surface, null, fakeProxy(0x11000));
+    const surface_id = try engine.surfaceCreate(surface_only_client, surface_resource);
+
+    const output_client = try engine.clientCreate(-1, -1);
+    const output_resource = try engine.resourceCreate(output_client, .output, null, null);
+    const output_id = try engine.outputCreate(output_resource, 2);
+    engine.effects.clear();
+
+    try engine.clientDestroy(resource_only_client);
+    try engine.clientDestroy(surface_only_client);
+    try engine.clientDestroy(output_client);
+
+    try std.testing.expect(!engine.model.resources.contains(resource_only));
+    try std.testing.expect(!engine.model.resources.contains(surface_resource));
+    try std.testing.expect(!engine.model.surfaces.contains(surface_id));
+    try std.testing.expect(!engine.model.resources.contains(output_resource));
+    try std.testing.expect(!engine.model.outputs.contains(output_id));
+    try std.testing.expect(wayembed.data.invariants.check(&engine.model).ok());
 }
