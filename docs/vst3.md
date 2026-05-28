@@ -85,7 +85,7 @@ IWaylandHost::openWaylandConnection()
      or wayembed_server_open_client_fd()
 
 IPlugView::attached(parent, WaylandSurfaceID)
-  -> parent is the host editor wl_surface
+  -> parent is a proxy for the host editor wl_surface on the plugin display
   -> plugin creates child wl_surface on the wayembed display
   -> host attaches child through wayembed_embed_attach()
 
@@ -151,3 +151,28 @@ real host integration
 
 That split keeps the core small and gives VST3 a serious path when a host is
 ready to own the SDK work.
+
+## Real-Host Spike Boundary
+
+The first real-host spike uses nilamp as a controlled VST3 plugin and
+`wayembed-sandbox` as the controlled host. It is intentionally a proof harness,
+not a general VST3 host.
+
+For strict VST3 Wayland conformance, the parent pointer passed to
+`IPlugView::attached(parent, WaylandSurfaceID)` must belong to the plugin's
+wayembed client display. If the host already has a real `wl_surface *` on its
+compositor connection, it needs a plugin-display proxy before passing the parent
+to the plugin.
+
+`wayembed_server_create_proxy()` is reserved for that shape, but it is not yet
+implemented. The first nilamp smoke editor is controlled: it validates the
+platform type, opens the host-provided Wayland connection, creates a child
+surface, and does not dereference the parent pointer. That proves the
+host-display handoff and embed attach path without claiming full VST3 parent
+proxy support.
+
+The current embed API still expects the plugin-created child surface to be
+role-less when `on_surface_created` fires. `wayembed_embed_attach()` assigns the
+host-side subsurface role. A plugin that assigns its own subsurface role through
+`wl_subcompositor.get_subsurface` is following the VST3 3.8 wording more
+strictly, but that is a separate compatibility path from this smoke harness.
