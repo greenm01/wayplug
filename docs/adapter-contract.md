@@ -8,6 +8,10 @@ The adapter header intentionally has no CLAP, LV2, or VST3 dependency. Hosts tha
 already speak those formats translate between format-native objects and the
 small wayembed handoff structs.
 
+Fallback policy lives with the host. See
+[plugin-ui-fallbacks.md](plugin-ui-fallbacks.md) for generated-control and
+XWayland boundaries.
+
 ## Shared Lifecycle
 
 The host creates and owns a normal `wayembed_server`:

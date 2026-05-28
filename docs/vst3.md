@@ -115,6 +115,10 @@ tokens. It is VST3's platform type.
 Do not drop generated controls or XWayland fallback plans. Many VST3 plugins
 will not support the 3.8 Wayland path yet.
 
+The fallback boundary lives in
+[plugin-ui-fallbacks.md](plugin-ui-fallbacks.md). VST3 glue can choose a
+fallback, but it should not pull that policy into `wayembed` core.
+
 ## Priority Shift
 
 Before VST3 3.8, CLAP and LV2 were the cleanest places to prove the adapter

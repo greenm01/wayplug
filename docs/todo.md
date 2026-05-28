@@ -12,10 +12,6 @@ The experimental CLAP, LV2, and VST3 handoff contract lives in
 Next work:
 
 - Build a real-host VST3 spike against the VST3 3.8 Wayland path.
-- Document a host-owned generated-control fallback for plugins without native
-  Wayland UIs.
-- Document the XWayland containment story if generated controls are not enough
-  for common legacy plugins.
 - Add adapter helper APIs only when real host glue shows repeated code that the
   core can own without taking over plugin loading.
 - Keep Element and Carla notes focused on host integration shape, not local
