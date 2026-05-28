@@ -23,6 +23,33 @@ pub fn build(b: *std.Build) void {
     lib.installHeader(b.path("include/wayembed_adapters.h"), "wayembed_adapters.h");
     b.installArtifact(lib);
 
+    const fuzz_harness_mod = b.addModule("fuzz_harness", .{
+        .root_source_file = b.path("tests/fuzz_harness.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    fuzz_harness_mod.addImport("wayembed", wayembed_mod);
+
+    const fuzz_lifecycle_mod = b.createModule(.{
+        .root_source_file = b.path("tools/fuzz_lifecycle.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    fuzz_lifecycle_mod.addImport("fuzz_harness", fuzz_harness_mod);
+    fuzz_lifecycle_mod.addImport("wayembed", wayembed_mod);
+    linkWayland(fuzz_lifecycle_mod);
+    const fuzz_lifecycle = b.addExecutable(.{
+        .name = "wayembed-fuzz-lifecycle",
+        .root_module = fuzz_lifecycle_mod,
+    });
+    b.installArtifact(fuzz_lifecycle);
+    const fuzz_lifecycle_run = b.addRunArtifact(fuzz_lifecycle);
+    removeSmokeEnvironment(fuzz_lifecycle_run);
+    if (b.args) |args| fuzz_lifecycle_run.addArgs(args);
+    const fuzz_lifecycle_step = b.step("fuzz-lifecycle", "Run deterministic lifecycle fuzz harness");
+    fuzz_lifecycle_step.dependOn(&fuzz_lifecycle_run.step);
+
     const test_step = b.step("test", "Run unit and C ABI smoke tests");
     var previous_test_run: ?*std.Build.Step = null;
 
@@ -48,6 +75,7 @@ pub fn build(b: *std.Build) void {
     const integration_test_files = [_][]const u8{
         "tests/data_tests.zig",
         "tests/engine_tests.zig",
+        "tests/fuzz_tests.zig",
         "tests/protocol_smoke_tests.zig",
     };
     for (integration_test_files) |path| {
@@ -58,6 +86,9 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         });
         mod.addImport("wayembed", wayembed_mod);
+        if (std.mem.eql(u8, path, "tests/fuzz_tests.zig")) {
+            mod.addImport("fuzz_harness", fuzz_harness_mod);
+        }
         linkWayland(mod);
         const t = b.addTest(.{ .root_module = mod });
         const run = b.addRunArtifact(t);

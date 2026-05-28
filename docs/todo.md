@@ -34,9 +34,6 @@ Next work:
 
 Remaining Phase 4 work:
 
-- Add a targeted fuzz harness for delegate request sequences and model
-  operations that own cleanup. Acceptance: fuzz failures produce reproducible
-  protocol/error traces.
 - Add fractional scale and viewporter support only when real plugin UI behavior
   needs it. Acceptance: embedded geometry, output scale, and buffer scale stay
   coherent across host and plugin surfaces.
