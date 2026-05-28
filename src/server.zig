@@ -11,6 +11,8 @@ const engine_surface = @import("engine/surface.zig");
 const host_mod = @import("host.zig");
 const protocol_registry = @import("protocol/registry.zig");
 const protocol_runtime = @import("protocol/runtime.zig");
+const protocol_seat = @import("protocol/seat.zig");
+const protocol_xdg_surface = @import("protocol/xdg_surface.zig");
 const wlc = @import("wayland/client.zig");
 const wlp = @import("wayland/protocols.zig");
 const wls = @import("wayland/server.zig");
@@ -753,6 +755,8 @@ fn clientDestroyed(listener: ?*wls.wl_listener, data: ?*anyopaque) callconv(.c) 
 
 const runtime_helpers = protocol_runtime.Helpers(Server, ResourceData);
 const registry_bindings = protocol_registry.Bindings(Server, ResourceData);
+const seat_bindings = protocol_seat.Bindings(Server, ResourceData);
+const xdg_surface_bindings = protocol_xdg_surface.Bindings(Server, ResourceData);
 
 // ===== production code above =====
 
@@ -1130,6 +1134,106 @@ test "fatal protocol error drains before embed and client teardown callbacks" {
     try std.testing.expectEqual(@intFromEnum(embed_id), state.embed_id);
     try std.testing.expectEqual(@as(usize, 0), s.client_handles.items.len);
     try std.testing.expectEqual(@as(usize, 0), s.embed_handles.items.len);
+}
+
+test "seat missing capability reports fatal protocol error" {
+    var state = LifecycleOrderTestState{};
+    var registry_state = RegistryTestState{
+        .seat_enabled = true,
+        .seat_capabilities = 0,
+    };
+    var iface = testHostInterface(&registry_state);
+    iface.userdata = &state;
+    iface.on_client_closed = recordLifecycleClientClosed;
+    iface.on_protocol_error = recordLifecycleProtocolError;
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    _ = s.openClientDisplay() orelse return error.OpenClientDisplayFailed;
+    const handle = s.client_handles.items[0];
+    const seat_resource = s.createResource(
+        handle.wl_client.?,
+        .seat,
+        &wls.c.wl_seat_interface,
+        4,
+        2,
+        @ptrCast(&seat_bindings.impl),
+        null,
+    ) orelse return error.CreateSeatResourceFailed;
+    s.engine.effects.clear();
+
+    seat_bindings.impl.get_pointer.?(handle.wl_client, seat_resource, 3);
+
+    try std.testing.expect(handle.close_pending);
+    try std.testing.expect(!s.engine.model.clients.contains(handle.client_id));
+    try std.testing.expectEqual(@as(usize, 2), s.engine.effects.count());
+    const pending = s.engine.effects.pending();
+    try std.testing.expectEqual(@as(u32, @intCast(wls.c.WL_SEAT_ERROR_MISSING_CAPABILITY)), pending[0].protocol_error.code);
+    try std.testing.expectEqual(handle.client_id, pending[0].protocol_error.client_id);
+    try std.testing.expectEqual(handle.client_id, pending[1].client_closed);
+    try std.testing.expect(@import("data/invariants.zig").check(&s.engine.model).ok());
+
+    s.dispatch();
+    try std.testing.expectEqual(@as(u32, 2), state.calls);
+    try std.testing.expectEqual(@as([3]u8, .{ 'P', 'C', 0 }), state.order);
+    try std.testing.expectEqual(@as(u32, @intCast(wls.c.WL_SEAT_ERROR_MISSING_CAPABILITY)), state.protocol_code);
+    try std.testing.expectEqual(@as(usize, 0), s.client_handles.items.len);
+}
+
+test "xdg role conflict reports fatal protocol error" {
+    var state = LifecycleOrderTestState{};
+    var registry_state = RegistryTestState{ .xdg_wm_base_enabled = true };
+    var iface = testHostInterface(&registry_state);
+    iface.userdata = &state;
+    iface.on_client_closed = recordLifecycleClientClosed;
+    iface.on_protocol_error = recordLifecycleProtocolError;
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    _ = s.openClientDisplay() orelse return error.OpenClientDisplayFailed;
+    const handle = s.client_handles.items[0];
+    const wm_base_resource = s.createResource(
+        handle.wl_client.?,
+        .xdg_wm_base,
+        &xdgs.c.xdg_wm_base_interface,
+        7,
+        2,
+        null,
+        null,
+    ) orelse return error.CreateXdgWmBaseResourceFailed;
+    const surface_resource_id = try s.engine.resourceCreate(handle.client_id, .surface, null, null);
+    const surface_id = try s.engine.surfaceCreate(handle.client_id, surface_resource_id);
+    const xdg_resource = s.createResource(
+        handle.wl_client.?,
+        .xdg_surface,
+        &xdgs.c.xdg_surface_interface,
+        7,
+        3,
+        @ptrCast(&xdg_surface_bindings.impl),
+        null,
+    ) orelse return error.CreateXdgSurfaceResourceFailed;
+    const xdg_data = runtime_helpers.dataForResource(xdg_resource).?;
+    xdg_data.xdg_wm_base_resource = wm_base_resource;
+    xdg_data.xdg_surface_id = surface_id;
+    s.engine.effects.clear();
+
+    xdg_surface_bindings.impl.get_toplevel.?(handle.wl_client, xdg_resource, 4);
+    xdg_surface_bindings.impl.get_popup.?(handle.wl_client, xdg_resource, 5, null, null);
+
+    try std.testing.expect(handle.close_pending);
+    try std.testing.expect(!s.engine.model.clients.contains(handle.client_id));
+    try std.testing.expectEqual(@as(usize, 2), s.engine.effects.count());
+    const pending = s.engine.effects.pending();
+    try std.testing.expectEqual(@as(u32, @intCast(xdgs.c.XDG_WM_BASE_ERROR_ROLE)), pending[0].protocol_error.code);
+    try std.testing.expectEqual(handle.client_id, pending[0].protocol_error.client_id);
+    try std.testing.expectEqual(handle.client_id, pending[1].client_closed);
+    try std.testing.expect(@import("data/invariants.zig").check(&s.engine.model).ok());
+
+    s.dispatch();
+    try std.testing.expectEqual(@as(u32, 2), state.calls);
+    try std.testing.expectEqual(@as([3]u8, .{ 'P', 'C', 0 }), state.order);
+    try std.testing.expectEqual(@as(u32, @intCast(xdgs.c.XDG_WM_BASE_ERROR_ROLE)), state.protocol_code);
+    try std.testing.expectEqual(@as(usize, 0), s.client_handles.items.len);
 }
 
 test "embedded coordinate translation subtracts host subsurface offset" {

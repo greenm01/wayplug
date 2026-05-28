@@ -32,18 +32,11 @@ Next work:
 
 ## Phase 4: Performance and Completeness
 
-Build Phase 4 in dependency order:
+Remaining Phase 4 work:
 
-- Harden lifecycle validation first. Cover partially-created resources,
-  already-closing clients, protocol-error teardown, callback ordering, and
-  model invariants. Acceptance: tests prove invalid or repeated teardown does
-  not leak handles, double-fire callbacks, or leave stale indexes.
-- Add protocol-error tests for malformed requests and invalid object-state
-  transitions. Acceptance: delegates report the protocol error, close or mark
-  the client consistently, and preserve teardown ordering.
-- Add a targeted fuzz harness after lifecycle behavior is stable. Focus it on
-  delegate request sequences and model operations that own cleanup. Acceptance:
-  fuzz failures produce reproducible protocol/error traces.
+- Add a targeted fuzz harness for delegate request sequences and model
+  operations that own cleanup. Acceptance: fuzz failures produce reproducible
+  protocol/error traces.
 - Add fractional scale and viewporter support only when real plugin UI behavior
   needs it. Acceptance: embedded geometry, output scale, and buffer scale stay
   coherent across host and plugin surfaces.

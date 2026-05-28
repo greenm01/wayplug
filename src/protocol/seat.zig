@@ -33,7 +33,7 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
         fn seatGetPointer(client: ?*wls.wl_client, resource: ?*wls.wl_resource, id: u32) callconv(.c) void {
             const data = H.dataForResource(resource) orelse return;
             if (!hasCapability(data, wls.c.WL_SEAT_CAPABILITY_POINTER)) {
-                postMissingCapability(resource);
+                postMissingCapability(data);
                 return;
             }
             const seat = H.resourceProxyAs(wlp.wl_seat, resource) orelse return;
@@ -56,7 +56,7 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
         fn seatGetKeyboard(client: ?*wls.wl_client, resource: ?*wls.wl_resource, id: u32) callconv(.c) void {
             const data = H.dataForResource(resource) orelse return;
             if (!hasCapability(data, wls.c.WL_SEAT_CAPABILITY_KEYBOARD)) {
-                postMissingCapability(resource);
+                postMissingCapability(data);
                 return;
             }
             const seat = H.resourceProxyAs(wlp.wl_seat, resource) orelse return;
@@ -79,7 +79,7 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
         fn seatGetTouch(client: ?*wls.wl_client, resource: ?*wls.wl_resource, id: u32) callconv(.c) void {
             const data = H.dataForResource(resource) orelse return;
             if (!hasCapability(data, wls.c.WL_SEAT_CAPABILITY_TOUCH)) {
-                postMissingCapability(resource);
+                postMissingCapability(data);
                 return;
             }
             const seat = H.resourceProxyAs(wlp.wl_seat, resource) orelse return;
@@ -99,13 +99,13 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
             _ = wlc.c.wl_touch_add_listener(touch, &touch_bindings.listener, touch_data);
         }
 
-        fn postMissingCapability(resource: ?*wls.wl_resource) void {
-            const seat_resource = resource orelse return;
+        fn postMissingCapability(data: *ResourceData) void {
             wls.c.wl_resource_post_error(
-                seat_resource,
+                data.wl_resource,
                 wls.c.WL_SEAT_ERROR_MISSING_CAPABILITY,
                 "wayembed does not expose the requested wl_seat capability",
             );
+            data.server.fatalProtocolError(data.client_id, @intCast(wls.c.WL_SEAT_ERROR_MISSING_CAPABILITY));
         }
 
         fn hasCapability(data: *ResourceData, capability: c_int) bool {
