@@ -6,6 +6,7 @@ pub const c = @cImport({
     @cInclude("wayland-client.h");
     @cInclude("wayland-client-protocol.h");
     @cInclude("xdg-shell-client-protocol.h");
+    @cInclude("linux-dmabuf-client-protocol.h");
 });
 
 pub const wl_display = c.struct_wl_display;

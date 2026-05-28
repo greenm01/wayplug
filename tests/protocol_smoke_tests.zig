@@ -58,6 +58,8 @@ test "every protocol delegate has a create() that compiles" {
     _ = wayembed.protocol.subsurface.create();
     _ = wayembed.protocol.shm.create();
     _ = wayembed.protocol.shm_pool.create();
+    _ = wayembed.protocol.linux_dmabuf.create();
+    _ = wayembed.protocol.linux_buffer_params.create();
     _ = wayembed.protocol.buffer.create();
     _ = wayembed.protocol.callback.create();
     _ = wayembed.protocol.region.create();
@@ -81,6 +83,7 @@ test "active protocol bindings instantiate against server runtime" {
     _ = Registry.bindCompositor;
     _ = Registry.bindSubcompositor;
     _ = Registry.bindShm;
+    _ = Registry.bindDmabuf;
     _ = Registry.bindSeat;
     _ = Registry.bindOutput;
     _ = Registry.bindXdgWmBase;
@@ -97,6 +100,12 @@ test "active protocol bindings instantiate against server runtime" {
     _ = Shm.impl;
     const ShmPool = wayembed.protocol.shm_pool.Bindings(Server, ResourceData);
     _ = ShmPool.impl;
+    const LinuxDmabuf = wayembed.protocol.linux_dmabuf.Bindings(Server, ResourceData);
+    _ = LinuxDmabuf.impl;
+    _ = LinuxDmabuf.listener;
+    const LinuxBufferParams = wayembed.protocol.linux_buffer_params.Bindings(Server, ResourceData);
+    _ = LinuxBufferParams.impl;
+    _ = LinuxBufferParams.listener;
     const Buffer = wayembed.protocol.buffer.Bindings(Server, ResourceData);
     _ = Buffer.impl;
     _ = Buffer.listener;

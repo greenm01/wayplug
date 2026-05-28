@@ -48,6 +48,7 @@ Wayland globals a server advertises to a plugin display.
 | `WAYEMBED_FEATURE_OUTPUT` | initial `wl_output` metadata |
 | `WAYEMBED_FEATURE_XDG_SHELL` | delegated XDG shell objects |
 | `WAYEMBED_FEATURE_CLIENT_FD` | raw client fd handoff for out-of-process plugins |
+| `WAYEMBED_FEATURE_LINUX_DMABUF` | delegated `zwp_linux_dmabuf_v1` buffer creation |
 
 ## Shape of a Session
 

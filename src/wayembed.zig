@@ -28,6 +28,8 @@ pub const protocol = struct {
     pub const subsurface = @import("protocol/subsurface.zig");
     pub const shm = @import("protocol/shm.zig");
     pub const shm_pool = @import("protocol/shm_pool.zig");
+    pub const linux_dmabuf = @import("protocol/linux_dmabuf.zig");
+    pub const linux_buffer_params = @import("protocol/linux_buffer_params.zig");
     pub const buffer = @import("protocol/buffer.zig");
     pub const callback = @import("protocol/callback.zig");
     pub const region = @import("protocol/region.zig");
@@ -47,6 +49,8 @@ pub const wayland = struct {
     pub const client = @import("wayland/client.zig");
     pub const server = @import("wayland/server.zig");
     pub const protocols = @import("wayland/protocols.zig");
+    pub const dmabuf_client = @import("wayland/dmabuf_client.zig");
+    pub const dmabuf_server = @import("wayland/dmabuf_server.zig");
     pub const xdg_client = @import("wayland/xdg_client.zig");
     pub const xdg_server = @import("wayland/xdg_server.zig");
 };

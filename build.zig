@@ -3,7 +3,13 @@ const std = @import("std");
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-    const xdg = xdgProtocol(b);
+    const protocols_dir = b.option(
+        []const u8,
+        "wayland-protocols-dir",
+        "Directory containing stable Wayland protocol XML files",
+    ) orelse "/usr/share/wayland-protocols";
+    const xdg = xdgProtocol(b, protocols_dir);
+    const dmabuf = linuxDmabufProtocol(b, protocols_dir);
 
     const wayembed_mod = b.addModule("wayembed", .{
         .root_source_file = b.path("src/wayembed.zig"),
@@ -13,6 +19,7 @@ pub fn build(b: *std.Build) void {
     });
     linkWayland(wayembed_mod);
     addXdgProtocol(wayembed_mod, xdg);
+    addLinuxDmabufProtocol(wayembed_mod, dmabuf);
 
     const lib = b.addLibrary(.{
         .linkage = .static,
@@ -62,6 +69,7 @@ pub fn build(b: *std.Build) void {
     });
     linkWayland(unit_test_mod);
     addXdgProtocol(unit_test_mod, xdg);
+    addLinuxDmabufProtocol(unit_test_mod, dmabuf);
     const unit_tests = b.addTest(.{
         .root_module = unit_test_mod,
     });
@@ -137,17 +145,18 @@ const XdgProtocol = struct {
     private_code: std.Build.LazyPath,
 };
 
+const LinuxDmabufProtocol = struct {
+    client_header: std.Build.LazyPath,
+    server_header: std.Build.LazyPath,
+    private_code: std.Build.LazyPath,
+};
+
 fn linkWayland(module: *std.Build.Module) void {
     module.linkSystemLibrary("wayland-server", .{ .use_pkg_config = .yes });
     module.linkSystemLibrary("wayland-client", .{ .use_pkg_config = .yes });
 }
 
-fn xdgProtocol(b: *std.Build) XdgProtocol {
-    const protocols_dir = b.option(
-        []const u8,
-        "wayland-protocols-dir",
-        "Directory containing stable Wayland protocol XML files",
-    ) orelse "/usr/share/wayland-protocols";
+fn xdgProtocol(b: *std.Build, protocols_dir: []const u8) XdgProtocol {
     const xml = std.Build.LazyPath{
         .cwd_relative = b.fmt("{s}/stable/xdg-shell/xdg-shell.xml", .{protocols_dir}),
     };
@@ -171,11 +180,44 @@ fn xdgProtocol(b: *std.Build) XdgProtocol {
     };
 }
 
+fn linuxDmabufProtocol(b: *std.Build, protocols_dir: []const u8) LinuxDmabufProtocol {
+    const xml = std.Build.LazyPath{
+        .cwd_relative = b.fmt("{s}/stable/linux-dmabuf/linux-dmabuf-v1.xml", .{protocols_dir}),
+    };
+
+    const client = b.addSystemCommand(&.{ "wayland-scanner", "client-header" });
+    client.addFileArg(xml);
+    const client_header = client.addOutputFileArg("linux-dmabuf-client-protocol.h");
+
+    const server = b.addSystemCommand(&.{ "wayland-scanner", "server-header" });
+    server.addFileArg(xml);
+    const server_header = server.addOutputFileArg("linux-dmabuf-server-protocol.h");
+
+    const code = b.addSystemCommand(&.{ "wayland-scanner", "private-code" });
+    code.addFileArg(xml);
+    const private_code = code.addOutputFileArg("linux-dmabuf-protocol.c");
+
+    return .{
+        .client_header = client_header,
+        .server_header = server_header,
+        .private_code = private_code,
+    };
+}
+
 fn addXdgProtocol(module: *std.Build.Module, xdg: XdgProtocol) void {
     module.addIncludePath(xdg.client_header.dirname());
     module.addIncludePath(xdg.server_header.dirname());
     module.addCSourceFile(.{
         .file = xdg.private_code,
+        .flags = &.{ "-std=c99", "-Wno-unused-parameter" },
+    });
+}
+
+fn addLinuxDmabufProtocol(module: *std.Build.Module, dmabuf: LinuxDmabufProtocol) void {
+    module.addIncludePath(dmabuf.client_header.dirname());
+    module.addIncludePath(dmabuf.server_header.dirname());
+    module.addCSourceFile(.{
+        .file = dmabuf.private_code,
         .flags = &.{ "-std=c99", "-Wno-unused-parameter" },
     });
 }

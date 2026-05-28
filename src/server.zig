@@ -13,6 +13,7 @@ const protocol_registry = @import("protocol/registry.zig");
 const protocol_runtime = @import("protocol/runtime.zig");
 const protocol_seat = @import("protocol/seat.zig");
 const protocol_xdg_surface = @import("protocol/xdg_surface.zig");
+const dmabufs = @import("wayland/dmabuf_server.zig");
 const wlc = @import("wayland/client.zig");
 const wlp = @import("wayland/protocols.zig");
 const wls = @import("wayland/server.zig");
@@ -391,6 +392,9 @@ pub const Server = struct {
         if (self.host.getShm() != null) {
             try self.registerGlobal(&wls.c.wl_shm_interface, 1, registry_bindings.bindShm);
         }
+        if (self.host.getDmabuf() != null) {
+            try self.registerGlobal(&dmabufs.c.zwp_linux_dmabuf_v1_interface, @intCast(@import("protocol/linux_dmabuf.zig").max_version), registry_bindings.bindDmabuf);
+        }
         if (self.host.getSeat() != null) {
             try self.registerGlobal(&wls.c.wl_seat_interface, 4, registry_bindings.bindSeat);
         }
@@ -635,6 +639,7 @@ pub const Server = struct {
             .pointer,
             .keyboard,
             .touch,
+            .linux_buffer_params,
             .buffer,
             .shm_pool,
             .callback,
@@ -657,6 +662,7 @@ pub const Server = struct {
             .compositor,
             .subcompositor,
             .shm,
+            .linux_dmabuf,
             .seat,
             .output,
             .xdg_wm_base,
@@ -669,6 +675,7 @@ pub const Server = struct {
             },
             .subsurface => wlc.c.wl_subsurface_destroy(@ptrCast(proxy)),
             .region => wlc.c.wl_region_destroy(@ptrCast(proxy)),
+            .linux_buffer_params => @import("wayland/dmabuf_client.zig").c.zwp_linux_buffer_params_v1_destroy(@ptrCast(proxy)),
             .shm_pool => wlc.c.wl_shm_pool_destroy(@ptrCast(proxy)),
             .buffer => wlc.c.wl_buffer_destroy(@ptrCast(proxy)),
             .callback => wlc.c.wl_callback_destroy(@ptrCast(proxy)),
@@ -794,6 +801,7 @@ const RegistryTestState = struct {
     compositor_enabled: bool = false,
     subcompositor_enabled: bool = false,
     shm_enabled: bool = false,
+    dmabuf_enabled: bool = false,
     seat_enabled: bool = false,
     xdg_wm_base_enabled: bool = false,
     output_enabled: bool = false,
@@ -816,6 +824,12 @@ fn fakeShm(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_shm {
     const state: *RegistryTestState = @ptrCast(@alignCast(userdata.?));
     if (!state.shm_enabled) return null;
     return @ptrFromInt(0x3000);
+}
+
+fn fakeDmabuf(userdata: ?*anyopaque) callconv(.c) ?*wlp.zwp_linux_dmabuf_v1 {
+    const state: *RegistryTestState = @ptrCast(@alignCast(userdata.?));
+    if (!state.dmabuf_enabled) return null;
+    return @ptrFromInt(0x3500);
 }
 
 fn fakeSeat(userdata: ?*anyopaque) callconv(.c) ?*wlp.wl_seat {
@@ -867,7 +881,7 @@ fn testHostInterface(userdata: ?*anyopaque) c_api.WayembedHostInterface {
         .get_shm = fakeShm,
         .get_seat = fakeSeat,
         .get_xdg_wm_base = fakeXdgWmBase,
-        .get_dmabuf = null,
+        .get_dmabuf = fakeDmabuf,
         .get_seat_capabilities = fakeSeatCapabilities,
         .get_seat_name = null,
         .get_output_info = fakeOutputInfo,
@@ -1540,6 +1554,16 @@ test "server registers host-supplied seat global" {
 
     try std.testing.expectEqual(@as(usize, 1), s.globals.items.len);
     try std.testing.expectEqual(@as(u32, 4), wls.c.wl_global_get_version(s.globals.items[0]));
+}
+
+test "server registers host-supplied dmabuf global" {
+    var state = RegistryTestState{ .dmabuf_enabled = true };
+    const iface = testHostInterface(&state);
+    const s = try Server.create(std.testing.allocator, &iface, null);
+    defer s.destroy();
+
+    try std.testing.expectEqual(@as(usize, 1), s.globals.items.len);
+    try std.testing.expectEqual(@as(u32, 3), wls.c.wl_global_get_version(s.globals.items[0]));
 }
 
 test "server registers host-supplied xdg_wm_base global" {

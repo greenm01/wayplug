@@ -31,6 +31,7 @@ pub const feature_touch: u64 = 1 << 8;
 pub const feature_output: u64 = 1 << 9;
 pub const feature_xdg_shell: u64 = 1 << 10;
 pub const feature_client_fd: u64 = 1 << 11;
+pub const feature_linux_dmabuf: u64 = 1 << 12;
 const compiled_features: u64 =
     feature_compositor |
     feature_subcompositor |
@@ -43,7 +44,8 @@ const compiled_features: u64 =
     feature_touch |
     feature_output |
     feature_xdg_shell |
-    feature_client_fd;
+    feature_client_fd |
+    feature_linux_dmabuf;
 pub const embed_status_ok: u32 = 0;
 pub const embed_status_invalid_argument: u32 = 1;
 pub const embed_status_client_closing: u32 = 2;
@@ -590,6 +592,7 @@ test "feature query validates size and version" {
     try std.testing.expect((features.flags & feature_surface) != 0);
     try std.testing.expect((features.flags & feature_seat) != 0);
     try std.testing.expect((features.flags & feature_xdg_shell) != 0);
+    try std.testing.expect((features.flags & feature_linux_dmabuf) != 0);
 
     features.size = @offsetOf(WayembedFeatures, "flags");
     features.version = abi_version;

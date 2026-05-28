@@ -2,6 +2,7 @@
 //! `wayembed_host_interface` getters.
 
 const wlc = @import("client.zig");
+const dmabuf = @import("dmabuf_client.zig");
 const xdg = @import("xdg_client.zig");
 
 pub const wl_compositor = wlc.c.struct_wl_compositor;
@@ -25,8 +26,9 @@ pub const xdg_surface = xdg.xdg_surface;
 pub const xdg_toplevel = xdg.xdg_toplevel;
 pub const xdg_popup = xdg.xdg_popup;
 
-// Later protocols stay opaque until their generated bindings land.
-pub const zwp_linux_dmabuf_v1 = opaque {};
+pub const zwp_linux_dmabuf_v1 = dmabuf.zwp_linux_dmabuf_v1;
+pub const zwp_linux_buffer_params_v1 = dmabuf.zwp_linux_buffer_params_v1;
+pub const zwp_linux_dmabuf_feedback_v1 = dmabuf.zwp_linux_dmabuf_feedback_v1;
 
 test "opaque types are declared" {
     const std = @import("std");

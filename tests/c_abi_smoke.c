@@ -47,7 +47,8 @@ static int check_feature_flags(uint64_t flags)
         WAYEMBED_FEATURE_TOUCH |
         WAYEMBED_FEATURE_OUTPUT |
         WAYEMBED_FEATURE_XDG_SHELL |
-        WAYEMBED_FEATURE_CLIENT_FD;
+        WAYEMBED_FEATURE_CLIENT_FD |
+        WAYEMBED_FEATURE_LINUX_DMABUF;
     return (flags & expected) == expected;
 }
 

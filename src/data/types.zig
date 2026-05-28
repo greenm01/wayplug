@@ -61,6 +61,8 @@ pub const ResourceKind = enum {
     region,
     shm,
     shm_pool,
+    linux_dmabuf,
+    linux_buffer_params,
     buffer,
     callback,
     seat,

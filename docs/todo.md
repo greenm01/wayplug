@@ -37,12 +37,10 @@ Remaining Phase 4 work:
 - Add fractional scale and viewporter support only when real plugin UI behavior
   needs it. Acceptance: embedded geometry, output scale, and buffer scale stay
   coherent across host and plugin surfaces.
-- Add Linux dmabuf after shm and lifecycle paths stay solid. Acceptance:
-  dmabuf globals and buffers forward without changing the existing shm path or
-  core format-neutral API shape.
 
 ## Deferred
 
 - `xdg_foreign` for floating editors and transient dialogs.
+- Linux dmabuf feedback objects and live device-specific dmabuf smoke coverage.
 - Stable public CLAP/LV2/VST3 extensions before more real host proof exists.
 - Full X11/XWayland compatibility inside the core delegated server.

@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const compositor_protocol = @import("compositor.zig");
+const dmabuf_protocol = @import("linux_dmabuf.zig");
 const output_protocol = @import("output.zig");
 const runtime = @import("runtime.zig");
 const seat_protocol = @import("seat.zig");
@@ -10,6 +11,7 @@ const shm_protocol = @import("shm.zig");
 const subcompositor_protocol = @import("subcompositor.zig");
 const wls = @import("../wayland/server.zig");
 const xdg_protocol = @import("xdg_wm_base.zig");
+const dmabufs = @import("../wayland/dmabuf_server.zig");
 const xdgs = @import("../wayland/xdg_server.zig");
 
 pub const Delegate = struct {};
@@ -26,6 +28,7 @@ pub fn selectVersion(requested: u32, advertised_max: u32) ?u32 {
 pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
     const H = runtime.Helpers(Server, ResourceData);
     const compositor_bindings = compositor_protocol.Bindings(Server, ResourceData);
+    const dmabuf_bindings = dmabuf_protocol.Bindings(Server, ResourceData);
     const output_bindings = output_protocol.Bindings(Server, ResourceData);
     const seat_bindings = seat_protocol.Bindings(Server, ResourceData);
     const shm_bindings = shm_protocol.Bindings(Server, ResourceData);
@@ -102,6 +105,30 @@ pub fn Bindings(comptime Server: type, comptime ResourceData: type) type {
             ) orelse return;
             wls.c.wl_shm_send_format(resource, wls.c.WL_SHM_FORMAT_ARGB8888);
             wls.c.wl_shm_send_format(resource, wls.c.WL_SHM_FORMAT_XRGB8888);
+        }
+
+        pub fn bindDmabuf(client: ?*wls.wl_client, data: ?*anyopaque, version: u32, id: u32) callconv(.c) void {
+            const server = H.serverFromData(data) orelse return;
+            const wl_client = client orelse return;
+            const selected_version = selectVersion(version, dmabuf_protocol.max_version) orelse {
+                server.protocolErrorForClient(wl_client, invalid_method);
+                return;
+            };
+            const dmabuf = server.host.getDmabuf() orelse {
+                server.protocolErrorForClient(wl_client, implementation_error);
+                return;
+            };
+            const resource = server.createResource(
+                wl_client,
+                .linux_dmabuf,
+                &dmabufs.c.zwp_linux_dmabuf_v1_interface,
+                selected_version,
+                id,
+                @ptrCast(&dmabuf_bindings.impl),
+                @ptrCast(dmabuf),
+            ) orelse return;
+            const resource_data = H.dataForResource(resource) orelse return;
+            _ = @import("../wayland/dmabuf_client.zig").c.zwp_linux_dmabuf_v1_add_listener(dmabuf, &dmabuf_bindings.listener, resource_data);
         }
 
         pub fn bindSeat(client: ?*wls.wl_client, data: ?*anyopaque, version: u32, id: u32) callconv(.c) void {
