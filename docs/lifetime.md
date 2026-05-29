@@ -41,6 +41,12 @@ them.
 Keep those objects alive for the life of the server, or stop exposing the
 matching callback before they disappear. A stale host object is a host bug.
 
+The string fields returned by `get_seat_name` and `get_output_info` (the seat
+name and the output `make`, `model`, `name`, and `description`) are borrowed
+only for the duration of the callback. Wayembed copies their contents into the
+Wayland protocol messages it sends and never retains the pointers, so they may
+point to temporary storage. A NULL string selects a wayembed default.
+
 ## Plugin Displays And Clients
 
 `wayembed_server_open_client_display()` returns a plugin-side `wl_display *`.

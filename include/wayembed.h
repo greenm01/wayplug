@@ -52,6 +52,10 @@ typedef struct wayembed_client wayembed_client;
 typedef struct wayembed_embed wayembed_embed;
 typedef struct wayembed_snapshot wayembed_snapshot;
 
+/* String fields (make, model, name, description) are borrowed: wayembed copies
+ * their contents into the Wayland messages it sends and drops the pointers
+ * before get_output_info returns. They may point to temporary storage. A NULL
+ * field falls back to a wayembed default. */
 typedef struct wayembed_output_info {
     uint32_t size;
     uint32_t version;
@@ -133,7 +137,11 @@ typedef struct wayembed_host_interface {
     void (*on_embed_destroyed)(void *userdata, wayembed_embed *embed);
 
     uint32_t (*get_seat_capabilities)(void *userdata);
+    /* Returned string is borrowed for the call: wayembed copies it before
+     * returning and never retains the pointer. NULL selects a default. */
     const char *(*get_seat_name)(void *userdata);
+    /* Fills info for the delegated output. Return false to decline. String
+     * fields follow wayembed_output_info's borrowing rule. */
     bool (*get_output_info)(void *userdata, wayembed_output_info *info);
 } wayembed_host_interface;
 
