@@ -8,6 +8,11 @@ that server, and embeds the plugin editor under a host-owned parent surface.
 The public boundary is plain C, so hosts and plugins in any language can bind
 to it.
 
+Ownership stays explicit across that boundary. Each handle wayembed returns
+has one owner and one end, and destroying the server retires every handle it
+issued, in a fixed order. The [lifetime rules](docs/lifetime.md) spell this
+out and count as part of the ABI.
+
 The target is audio plugin UI hosting for CLAP, LV2, and VST3. The core stays
 format-neutral. Format glue belongs in the host or adapter layer.
 
@@ -75,6 +80,8 @@ Useful entry points:
 - [Experimental Adapter Contract](docs/adapter-contract.md) covers CLAP, LV2,
   and VST3 handoff rules.
 - [VST3 Wayland Notes](docs/vst3.md) covers the strict VST3 3.8 path.
+- [Lifetime Rules](docs/lifetime.md) state who owns each handle and when it
+  dies, plus the fixed teardown order.
 - [TODO](docs/todo.md) is the active backlog.
 
 ## License
